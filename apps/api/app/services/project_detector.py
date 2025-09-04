@@ -52,15 +52,37 @@ def is_frontend_project(repo_path: str) -> Tuple[bool, Optional[str]]:
         frontend_indicators = [
             'next', 'react', 'vue', 'angular', 'svelte', 'nuxt',
             'vite', 'webpack', 'parcel', 'rollup', 'esbuild',
-            'create-react-app', 'gatsby', 'remix'
+            'create-react-app', 'gatsby', 'remix', '@vue/cli',
+            'react-scripts', 'vue-cli-service'
+        ]
+        
+        # Backend-specific indicators that suggest this is NOT a frontend project
+        backend_indicators = [
+            'express', 'koa', 'fastify', 'hapi', 'restify',
+            'mongoose', 'sequelize', 'typeorm', 'prisma',
+            'body-parser', 'cors', 'helmet', 'passport',
+            'jsonwebtoken', 'bcrypt', 'nodemon', 'pm2'
         ]
         
         found_frameworks = []
+        found_backend = []
+        
         for dep_name in all_deps.keys():
+            # Check for frontend indicators
             for indicator in frontend_indicators:
                 if indicator in dep_name.lower():
                     found_frameworks.append(dep_name)
                     break
+            
+            # Check for backend indicators
+            for indicator in backend_indicators:
+                if indicator in dep_name.lower():
+                    found_backend.append(dep_name)
+                    break
+        
+        # If we have backend indicators but no frontend indicators, likely backend project
+        if found_backend and not found_frameworks:
+            return False, f"Backend project detected with: {', '.join(found_backend[:3])}"
         
         if found_frameworks:
             return True, f"Frontend project detected with: {', '.join(found_frameworks[:3])}"
