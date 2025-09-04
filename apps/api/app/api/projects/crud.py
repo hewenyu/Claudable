@@ -382,6 +382,7 @@ async def create_project(body: ProjectCreate, db: Session = Depends(get_db)) -> 
         preferred_cli=preferred_cli,
         selected_model=selected_model,
         fallback_enabled=fallback_enabled,
+        is_local_repo=True,  # Set default value for required field
     )
 
     db.add(project)
