@@ -183,6 +183,13 @@ async def switch_workspace_branch(
             detail=f"Branch '{branch_name}' not found. Available branches: {available_branches}"
         )
     
+    # Perform actual git checkout using git_projects API
+    from app.api.git_projects import run_git_command
+    
+    success, output = run_git_command(str(project_path), "checkout", branch_name)
+    if not success:
+        raise HTTPException(status_code=500, detail=f"Git checkout failed: {output}")
+    
     # Update workspace branch
     project.current_branch = branch_name
     project.branches = {"all": available_branches, "current": branch_name}
@@ -193,8 +200,29 @@ async def switch_workspace_branch(
     return {
         "message": f"Workspace switched to branch '{branch_name}'",
         "workspace_id": workspace_id,
-        "branch": branch_name
+        "branch": branch_name,
+        "git_output": output
     }
+
+
+@router.get("/{workspace_id}/branches", response_model=List[str])
+async def get_workspace_branches(workspace_id: str, db: Session = Depends(get_db)) -> List[str]:
+    """Get available branches for a workspace"""
+    
+    project = db.query(ProjectModel).filter(ProjectModel.id == workspace_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    
+    if not project.local_git_project_name:
+        raise HTTPException(status_code=400, detail="Not a Git workspace")
+    
+    # Get current Git info
+    project_path = Path(project.local_git_project_path)
+    if not project_path.exists():
+        raise HTTPException(status_code=404, detail="Local Git project path not found")
+    
+    git_info = get_git_info(str(project_path))
+    return git_info.get("branches", [])
 
 
 @router.delete("/{workspace_id}")

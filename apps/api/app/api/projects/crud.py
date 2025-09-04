@@ -64,6 +64,12 @@ class Project(BaseModel):
     initial_prompt: Optional[str] = None
     preferred_cli: Optional[str] = None
     selected_model: Optional[str] = None
+    
+    # Git workspace fields
+    local_git_project_name: Optional[str] = None
+    local_git_project_path: Optional[str] = None
+    current_branch: Optional[str] = None
+    git_url: Optional[str] = None
 
 
 router = APIRouter()
@@ -300,6 +306,10 @@ async def list_projects(db: Session = Depends(get_db)) -> List[Project]:
                 initial_prompt=project.initial_prompt,
                 preferred_cli=project.preferred_cli,
                 selected_model=project.selected_model,
+                local_git_project_name=project.local_git_project_name,
+                local_git_project_path=project.local_git_project_path,
+                current_branch=project.current_branch,
+                git_url=project.git_url,
             )
         )
 
@@ -334,6 +344,10 @@ async def get_project(project_id: str, db: Session = Depends(get_db)) -> Project
             initial_prompt=project.initial_prompt,
             preferred_cli=project.preferred_cli,
             selected_model=project.selected_model,
+            local_git_project_name=project.local_git_project_name,
+            local_git_project_path=project.local_git_project_path,
+            current_branch=project.current_branch,
+            git_url=project.git_url,
         )
     except HTTPException:
         raise
