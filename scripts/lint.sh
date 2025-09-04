@@ -6,15 +6,15 @@ echo "Running Python linting..."
 # Check Python code with flake8
 cd apps/api
 echo "  Checking with flake8..."
-python -m flake8 app
+.venv/bin/python -m flake8 app
 
 # Format Python code with black (check only)
 echo "  Checking formatting with black..."
-python -m black --check app
+.venv/bin/python -m black --check app
 
 # Sort imports with isort (check only)
 echo "  Checking import sorting with isort..."
-python -m isort --check-only app
+.venv/bin/python -m isort --check-only app
 
 echo "Python linting completed successfully!"
 

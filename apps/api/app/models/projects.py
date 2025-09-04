@@ -22,7 +22,7 @@ class Project(Base):
     template_type: Mapped[str | None] = mapped_column(
         String(64), nullable=True
     )  # nextjs, react, vue, etc.
-    
+
     # Git-related fields
     git_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     branches: Mapped[dict | None] = mapped_column(JSON, nullable=True)

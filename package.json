@@ -18,9 +18,9 @@
     "db:reset": "node scripts/reset-db.js",
     "db:backup": "node scripts/backup-db.js",
     "lint": "bash scripts/lint.sh",
-    "lint:python": "cd apps/api && python -m flake8 app && python -m black --check app && python -m isort --check-only app",
+    "lint:python": "cd apps/api && .venv/bin/python -m flake8 app && .venv/bin/python -m black --check app && .venv/bin/python -m isort --check-only app",
     "lint:fix": "npm run lint:fix:python",
-    "lint:fix:python": "cd apps/api && python -m black app && python -m isort app"
+    "lint:fix:python": "cd apps/api && .venv/bin/python -m black app && .venv/bin/python -m isort app"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
