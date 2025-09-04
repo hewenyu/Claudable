@@ -4,6 +4,7 @@ Base abstractions and shared utilities for CLI providers.
 This module defines a precise, minimal adapter contract (BaseCLI) and common
 helpers so that adding a new provider remains consistent and easy.
 """
+
 from __future__ import annotations
 
 import os
@@ -174,7 +175,8 @@ class BaseCLI(ABC):
         if model in cli_models:
             mapped_model = cli_models[model]
             ui.info(
-                f"Mapped '{model}' to '{mapped_model}' for {self.cli_type.value}", "Model"
+                f"Mapped '{model}' to '{mapped_model}' for {self.cli_type.value}",
+                "Model",
             )
             return mapped_model
 
@@ -206,7 +208,9 @@ class BaseCLI(ABC):
             or model in MODEL_MAPPING.get(self.cli_type.value, {}).values()
         )
 
-    def parse_message_data(self, data: Dict[str, Any], project_id: str, session_id: str) -> Message:
+    def parse_message_data(
+        self, data: Dict[str, Any], project_id: str, session_id: str
+    ) -> Message:
         """Normalize provider-specific message payload to our `Message`."""
         return Message(
             id=str(uuid.uuid4()),
@@ -346,7 +350,9 @@ class BaseCLI(ABC):
         }
         return tool_mapping.get(tool_name, tool_mapping.get(key_lower, key))
 
-    def _get_clean_tool_display(self, tool_name: str, tool_input: Dict[str, Any]) -> str:
+    def _get_clean_tool_display(
+        self, tool_name: str, tool_input: Dict[str, Any]
+    ) -> str:
         """Return a concise, Claude-like tool usage display line."""
         normalized_name = self._normalize_tool_name(tool_name)
 
@@ -540,9 +546,7 @@ class BaseCLI(ABC):
                 if name:
                     return f"**Glob** `{name}`"
                 return "**Glob** `finding files`"
-            pattern = tool_input.get("pattern", "") or tool_input.get(
-                "globPattern", ""
-            )
+            pattern = tool_input.get("pattern", "") or tool_input.get("globPattern", "")
             if pattern:
                 return f"**Glob** `{pattern}`"
             return "**Glob** `pattern`"

@@ -2,11 +2,13 @@
 WebSocket Endpoints
 Handles real-time WebSocket connections
 """
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
 import logging
 
-from app.core.websocket.manager import manager
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
 from app.core.terminal_ui import ui
+from app.core.websocket.manager import manager
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -18,7 +20,7 @@ async def websocket_endpoint(websocket: WebSocket, project_id: str):
     ui.info(f"Connection attempt for project: {project_id}", "WebSocket")
     try:
         await manager.connect(websocket, project_id)
-        
+
         while True:
             try:
                 data = await websocket.receive_text()

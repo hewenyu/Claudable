@@ -2,6 +2,7 @@
 
 Moved from unified_manager.py to a dedicated module.
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -11,8 +12,8 @@ from app.core.terminal_ui import ui
 from app.core.websocket.manager import manager as ws_manager
 from app.models.messages import Message
 
+from .adapters import ClaudeCodeCLI, CodexCLI, CursorAgentCLI, GeminiCLI, QwenCLI
 from .base import CLIType
-from .adapters import ClaudeCodeCLI, CursorAgentCLI, CodexCLI, QwenCLI, GeminiCLI
 
 
 class UnifiedCLIManager:
@@ -136,9 +137,15 @@ class UnifiedCLIManager:
                     ui.info(f"   Full event: {original_event}", "DEBUG")
                     ui.info(f"   is_error: {is_error}", "DEBUG")
                     ui.info(f"   subtype: '{subtype}'", "DEBUG")
-                    ui.info(f"   has event.result: {'result' in original_event}", "DEBUG")
-                    ui.info(f"   has event.status: {'status' in original_event}", "DEBUG")
-                    ui.info(f"   has event.success: {'success' in original_event}", "DEBUG")
+                    ui.info(
+                        f"   has event.result: {'result' in original_event}", "DEBUG"
+                    )
+                    ui.info(
+                        f"   has event.status: {'status' in original_event}", "DEBUG"
+                    )
+                    ui.info(
+                        f"   has event.success: {'success' in original_event}", "DEBUG"
+                    )
 
                     if is_error or subtype == "error":
                         has_error = True
@@ -162,7 +169,8 @@ class UnifiedCLIManager:
                         if not is_error:
                             result_success = True
                             ui.success(
-                                f"Cursor result: assuming success (no error detected)", "CLI"
+                                f"Cursor result: assuming success (no error detected)",
+                                "CLI",
                             )
 
             # Save message to database
@@ -174,8 +182,8 @@ class UnifiedCLIManager:
             messages_collected.append(message)
 
             # Check if message should be hidden from UI
-            should_hide = (
-                message.metadata_json and message.metadata_json.get("hidden_from_ui", False)
+            should_hide = message.metadata_json and message.metadata_json.get(
+                "hidden_from_ui", False
             )
 
             # Send message via WebSocket only if not hidden
@@ -188,7 +196,9 @@ class UnifiedCLIManager:
                         "message_type": message.message_type,
                         "content": message.content,
                         "metadata": message.metadata_json,
-                        "parent_message_id": getattr(message, "parent_message_id", None),
+                        "parent_message_id": getattr(
+                            message, "parent_message_id", None
+                        ),
                         "session_id": message.session_id,
                         "conversation_id": self.conversation_id,
                         "created_at": message.created_at.isoformat(),
@@ -252,9 +262,9 @@ class UnifiedCLIManager:
             if selected_model and status.get("available"):
                 cli = self.cli_adapters[cli_type]
                 if not cli.is_model_supported(selected_model):
-                    status[
-                        "model_warning"
-                    ] = f"Model '{selected_model}' may not be supported by {cli_type.value}"
+                    status["model_warning"] = (
+                        f"Model '{selected_model}' may not be supported by {cli_type.value}"
+                    )
                     status["suggested_models"] = status.get("default_models", [])
                 else:
                     status["selected_model"] = selected_model
