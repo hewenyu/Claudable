@@ -10,6 +10,7 @@ from app.api.assets import router as assets_router
 from app.api.chat import router as chat_router
 from app.api.commits import router as commits_router
 from app.api.env import router as env_router
+from app.api.git_projects import router as git_projects_router
 from app.api.github import router as github_router
 from app.api.project_services import router as project_services_router
 from app.api.projects import router as projects_router
@@ -17,6 +18,7 @@ from app.api.repo import router as repo_router
 from app.api.settings import router as settings_router
 from app.api.tokens import router as tokens_router
 from app.api.vercel import router as vercel_router
+from app.api.workspace import router as workspace_router
 from app.core.logging import configure_logging
 from app.core.terminal_ui import ui
 from app.db.base import Base
@@ -60,6 +62,8 @@ app.add_middleware(
 
 # Routers
 app.include_router(projects_router, prefix="/api/projects")
+app.include_router(git_projects_router)  # Already has /api/git-projects prefix
+app.include_router(workspace_router)  # Already has /api/workspace prefix
 app.include_router(repo_router)
 app.include_router(commits_router)
 app.include_router(env_router)

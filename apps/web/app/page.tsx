@@ -749,6 +749,17 @@ export default function HomePage() {
             </svg>
           </button>
           
+          {/* Local Projects button when sidebar is closed */}
+          <button
+            onClick={() => router.push('/local-projects')}
+            className="w-full h-12 flex items-center justify-center text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+            title="Local Git Projects"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v11z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          
           {/* Settings button when sidebar is closed */}
           <div className="mt-auto mb-2">
             <button
@@ -934,7 +945,16 @@ export default function HomePage() {
             </div>
           </div>
           
-          <div className="p-2 border-t border-gray-200 dark:border-white/10">
+          <div className="p-2 border-t border-gray-200 dark:border-white/10 space-y-1">
+            <button 
+              onClick={() => router.push('/local-projects')}
+              className="w-full flex items-center gap-2 p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-all text-sm"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v11z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Local Projects
+            </button>
             <button 
               onClick={() => setShowGlobalSettings(true)}
               className="w-full flex items-center gap-2 p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-all text-sm"
