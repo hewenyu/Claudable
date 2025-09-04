@@ -58,6 +58,12 @@ async def list_workspaces(db: Session = Depends(get_db)) -> List[WorkspaceProjec
         if project_path.exists():
             git_info = get_git_info(str(project_path))
             
+            # Fix missing repo_path for existing workspace projects
+            if not project.repo_path and project_path.exists():
+                project.repo_path = str(project_path)
+                project.local_git_project_path = str(project_path)
+                db.commit()
+            
             workspace = WorkspaceProject(
                 id=project.id,
                 name=project.name,
@@ -127,6 +133,7 @@ async def create_workspace(
         name=workspace_name,
         local_git_project_name=request.local_git_project_name,
         local_git_project_path=str(project_path),
+        repo_path=str(project_path),  # Fix: Set repo_path for CLI and preview functionality
         current_branch=request.branch_name,
         git_url=git_info.get("remote_url"),
         branches={"all": available_branches, "current": request.branch_name},
