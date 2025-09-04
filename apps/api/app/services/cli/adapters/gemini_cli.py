@@ -4,6 +4,7 @@ This adapter launches `gemini --experimental-acp`, communicates via JSON-RPC
 over stdio, and streams session/update notifications. Thought chunks are
 surfaced to the UI.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -107,7 +108,10 @@ class GeminiCLI(BaseCLI):
                 if not chosen:
                     return {"outcome": {"outcome": "cancelled"}}
                 return {
-                    "outcome": {"outcome": "selected", "optionId": chosen.get("optionId")}
+                    "outcome": {
+                        "outcome": "selected",
+                        "optionId": chosen.get("optionId"),
+                    }
                 }
 
             async def _fs_read(params: Dict[str, Any]) -> Dict[str, Any]:
@@ -116,7 +120,9 @@ class GeminiCLI(BaseCLI):
             async def _fs_write(params: Dict[str, Any]) -> Dict[str, Any]:
                 return {}
 
-            GeminiCLI._SHARED_CLIENT.on_request("session/request_permission", _handle_permission)
+            GeminiCLI._SHARED_CLIENT.on_request(
+                "session/request_permission", _handle_permission
+            )
             GeminiCLI._SHARED_CLIENT.on_request("fs/read_text_file", _fs_read)
             GeminiCLI._SHARED_CLIENT.on_request("fs/write_text_file", _fs_write)
 
@@ -184,7 +190,9 @@ class GeminiCLI(BaseCLI):
                 stored_session_id = result.get("sessionId")
                 if stored_session_id:
                     await self.set_session_id(project_id, stored_session_id)
-                    ui.info(f"[{turn_id}] session created: {stored_session_id}", "Gemini")
+                    ui.info(
+                        f"[{turn_id}] session created: {stored_session_id}", "Gemini"
+                    )
             except Exception as e:
                 # Authenticate then retry session/new
                 auth_method = os.getenv("GEMINI_AUTH_METHOD", "oauth-personal")
@@ -200,9 +208,14 @@ class GeminiCLI(BaseCLI):
                     stored_session_id = result.get("sessionId")
                     if stored_session_id:
                         await self.set_session_id(project_id, stored_session_id)
-                        ui.info(f"[{turn_id}] session created after auth: {stored_session_id}", "Gemini")
+                        ui.info(
+                            f"[{turn_id}] session created after auth: {stored_session_id}",
+                            "Gemini",
+                        )
                 except Exception as e2:
-                    ui.error(f"[{turn_id}] authentication/session failed: {e2}", "Gemini")
+                    ui.error(
+                        f"[{turn_id}] authentication/session failed: {e2}", "Gemini"
+                    )
                     yield Message(
                         id=str(uuid.uuid4()),
                         project_id=project_path,
@@ -248,6 +261,7 @@ class GeminiCLI(BaseCLI):
         if instruction:
             parts.append({"type": "text", "text": instruction})
         if images:
+
             def _iget(obj, key, default=None):
                 try:
                     if isinstance(obj, dict):
@@ -275,16 +289,21 @@ class GeminiCLI(BaseCLI):
                     except Exception:
                         pass
                 if b64:
-                    parts.append({"type": "image", "mimeType": "image/png", "data": b64})
+                    parts.append(
+                        {"type": "image", "mimeType": "image/png", "data": b64}
+                    )
 
         # Send prompt
         def _make_prompt_task() -> asyncio.Task:
-            ui.debug(f"[{turn_id}] sending session/prompt (parts={len(parts)})", "Gemini")
+            ui.debug(
+                f"[{turn_id}] sending session/prompt (parts={len(parts)})", "Gemini"
+            )
             return asyncio.create_task(
                 client.request(
                     "session/prompt", {"sessionId": stored_session_id, "prompt": parts}
                 )
             )
+
         prompt_task = _make_prompt_task()
 
         while True:
@@ -293,30 +312,43 @@ class GeminiCLI(BaseCLI):
                 return_when=asyncio.FIRST_COMPLETED,
             )
             if prompt_task in done:
-                ui.debug(f"[{turn_id}] prompt_task completed; draining updates", "Gemini")
+                ui.debug(
+                    f"[{turn_id}] prompt_task completed; draining updates", "Gemini"
+                )
                 # Drain remaining
                 while not q.empty():
                     update = q.get_nowait()
-                    async for m in self._update_to_messages(update, project_path, session_id, thought_buffer, text_buffer):
+                    async for m in self._update_to_messages(
+                        update, project_path, session_id, thought_buffer, text_buffer
+                    ):
                         if m:
                             yield m
                 exc = prompt_task.exception()
                 if exc:
                     msg = str(exc)
                     if "Session not found" in msg or "session not found" in msg.lower():
-                        ui.warning(f"[{turn_id}] session expired; creating a new session and retrying", "Gemini")
+                        ui.warning(
+                            f"[{turn_id}] session expired; creating a new session and retrying",
+                            "Gemini",
+                        )
                         try:
                             result = await client.request(
-                                "session/new", {"cwd": project_repo_path, "mcpServers": []}
+                                "session/new",
+                                {"cwd": project_repo_path, "mcpServers": []},
                             )
                             stored_session_id = result.get("sessionId")
                             if stored_session_id:
                                 await self.set_session_id(project_id, stored_session_id)
-                                ui.info(f"[{turn_id}] new session={stored_session_id}; retrying prompt", "Gemini")
+                                ui.info(
+                                    f"[{turn_id}] new session={stored_session_id}; retrying prompt",
+                                    "Gemini",
+                                )
                                 prompt_task = _make_prompt_task()
                                 continue
                         except Exception as e2:
-                            ui.error(f"[{turn_id}] session recovery failed: {e2}", "Gemini")
+                            ui.error(
+                                f"[{turn_id}] session recovery failed: {e2}", "Gemini"
+                            )
                             yield Message(
                                 id=str(uuid.uuid4()),
                                 project_id=project_path,
@@ -366,7 +398,9 @@ class GeminiCLI(BaseCLI):
                         ui.debug(f"[{turn_id}] processing update kind={kind}", "Gemini")
                     except Exception:
                         pass
-                    async for m in self._update_to_messages(update, project_path, session_id, thought_buffer, text_buffer):
+                    async for m in self._update_to_messages(
+                        update, project_path, session_id, thought_buffer, text_buffer
+                    ):
                         if m:
                             yield m
 
@@ -393,7 +427,9 @@ class GeminiCLI(BaseCLI):
         kind = update.get("sessionUpdate") or update.get("type")
         now = datetime.utcnow()
         if kind in ("agent_message_chunk", "agent_thought_chunk"):
-            text = ((update.get("content") or {}).get("text")) or update.get("text") or ""
+            text = (
+                ((update.get("content") or {}).get("text")) or update.get("text") or ""
+            )
             try:
                 ui.debug(
                     f"update chunk kind={kind} len={len(text or '')}",
@@ -414,7 +450,10 @@ class GeminiCLI(BaseCLI):
                         role="assistant",
                         message_type="chat",
                         content=self._compose_content(thought_buffer, []),
-                        metadata_json={"cli_type": self.cli_type.value, "event_type": "thinking"},
+                        metadata_json={
+                            "cli_type": self.cli_type.value,
+                            "event_type": "thinking",
+                        },
                         session_id=session_id,
                         created_at=now,
                     )
@@ -424,7 +463,11 @@ class GeminiCLI(BaseCLI):
         elif kind in ("tool_call", "tool_call_update"):
             tool_name = self._parse_tool_name(update)
             tool_input = self._extract_tool_input(update)
-            normalized = self._normalize_tool_name(tool_name) if hasattr(self, '_normalize_tool_name') else tool_name
+            normalized = (
+                self._normalize_tool_name(tool_name)
+                if hasattr(self, "_normalize_tool_name")
+                else tool_name
+            )
             # Render policy:
             # - Non-Write tools: render only on tool_call (start)
             # - Write tool: render only on tool_call_update (Gemini often emits updates only)
@@ -515,7 +558,9 @@ class GeminiCLI(BaseCLI):
                 created_at=now,
             )
 
-    def _compose_content(self, thought_buffer: List[str], text_buffer: List[str]) -> str:
+    def _compose_content(
+        self, thought_buffer: List[str], text_buffer: List[str]
+    ) -> str:
         parts: List[str] = []
         if thought_buffer:
             thinking = "".join(thought_buffer).strip()
@@ -547,7 +592,7 @@ class GeminiCLI(BaseCLI):
                     or first.get("uri")
                 )
                 if isinstance(path, str) and path.startswith("file://"):
-                    path = path[len("file://"):]
+                    path = path[len("file://") :]
         if not path:
             content = update.get("content")
             if isinstance(content, list):

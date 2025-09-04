@@ -2,6 +2,7 @@
 
 Moved from unified_manager.py to a dedicated adapter module.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -44,9 +45,7 @@ class CodexCLI(BaseCLI):
             print(f"[DEBUG] stderr: {stderr.decode().strip()}")
 
             if result.returncode != 0:
-                error_msg = (
-                    f"Codex CLI not installed or not working (returncode: {result.returncode}). stderr: {stderr.decode().strip()}"
-                )
+                error_msg = f"Codex CLI not installed or not working (returncode: {result.returncode}). stderr: {stderr.decode().strip()}"
                 print(f"[DEBUG] {error_msg}")
                 return {
                     "available": False,
@@ -102,12 +101,16 @@ class CodexCLI(BaseCLI):
         ui.info(f"Starting Codex execution with model: {cli_model}", "Codex")
 
         # Get project ID for session management
-        project_id = project_path.split("/")[-1] if "/" in project_path else project_path
+        project_id = (
+            project_path.split("/")[-1] if "/" in project_path else project_path
+        )
 
         # Determine the repo path - Codex should run in repo directory
         project_repo_path = os.path.join(project_path, "repo")
         if not os.path.exists(project_repo_path):
-            project_repo_path = project_path  # Fallback to project_path if repo subdir doesn't exist
+            project_repo_path = (
+                project_path  # Fallback to project_path if repo subdir doesn't exist
+            )
 
         # Build Codex command - --cd must come BEFORE proto subcommand
         workdir_abs = os.path.abspath(project_repo_path)
@@ -152,7 +155,8 @@ class CodexCLI(BaseCLI):
             if stored_rollout_path and os.path.exists(stored_rollout_path):
                 cmd.extend(["-c", f"experimental_resume={stored_rollout_path}"])
                 ui.info(
-                    f"Resuming Codex from stored rollout: {stored_rollout_path}", "Codex"
+                    f"Resuming Codex from stored rollout: {stored_rollout_path}",
+                    "Codex",
                 )
             else:
                 # Try to find latest rollout file for this project
@@ -281,14 +285,14 @@ Do not create subdirectories unless specifically requested by the user.
                 image_refs = []
                 for i in range(len(images)):
                     image_refs.append(f"[Image #{i+1}]")
-                image_context = (
-                    f"\n\nI've attached {len(images)} image(s) for you to analyze: {', '.join(image_refs)}"
-                )
+                image_context = f"\n\nI've attached {len(images)} image(s) for you to analyze: {', '.join(image_refs)}"
                 final_instruction_with_images = final_instruction + image_context
             else:
                 final_instruction_with_images = final_instruction
 
-            items: List[Dict[str, Any]] = [{"type": "text", "text": final_instruction_with_images}]
+            items: List[Dict[str, Any]] = [
+                {"type": "text", "text": final_instruction_with_images}
+            ]
 
             # Add images if provided
             if images:
@@ -314,11 +318,17 @@ Do not create subdirectories unless specifically requested by the user.
                         continue
 
                     # Support base64 via either 'base64_data' or legacy 'data'
-                    b64_str = _iget(image_data, "base64_data") or _iget(image_data, "data")
+                    b64_str = _iget(image_data, "base64_data") or _iget(
+                        image_data, "data"
+                    )
                     # Or a data URL in 'url'
                     if not b64_str:
                         url_val = _iget(image_data, "url")
-                        if isinstance(url_val, str) and url_val.startswith("data:") and "," in url_val:
+                        if (
+                            isinstance(url_val, str)
+                            and url_val.startswith("data:")
+                            and "," in url_val
+                        ):
                             b64_str = url_val.split(",", 1)[1]
 
                     if b64_str:
@@ -339,7 +349,9 @@ Do not create subdirectories unless specifically requested by the user.
                             elif "webp" in mime_type:
                                 suffix = ".webp"
 
-                            with _tmp.NamedTemporaryFile(delete=False, suffix=suffix) as tmpf:
+                            with _tmp.NamedTemporaryFile(
+                                delete=False, suffix=suffix
+                            ) as tmpf:
                                 tmpf.write(img_bytes)
                                 ui.info(
                                     f"📷 Image #{i+1} saved to temporary path: {tmpf.name}",
@@ -350,7 +362,10 @@ Do not create subdirectories unless specifically requested by the user.
                             ui.warning(f"Failed to decode attached image: {e}", "Codex")
 
             # Send to Codex
-            user_input = {"id": request_id, "op": {"type": "user_input", "items": items}}
+            user_input = {
+                "id": request_id,
+                "op": {"type": "user_input", "items": items},
+            }
 
             if process.stdin:
                 json_str = json.dumps(user_input)
@@ -384,7 +399,8 @@ Do not create subdirectories unless specifically requested by the user.
                     if (
                         current_request_id
                         and event_id != current_request_id
-                        and msg_type not in [
+                        and msg_type
+                        not in [
                             "session_configured",
                             "mcp_list_tools_response",
                         ]
@@ -535,7 +551,9 @@ Do not create subdirectories unless specifically requested by the user.
 
                         # Find and store the latest rollout file for this session
                         try:
-                            latest_rollout = self._find_latest_rollout_for_project(project_id)
+                            latest_rollout = self._find_latest_rollout_for_project(
+                                project_id
+                            )
                             if latest_rollout:
                                 await self.set_rollout_path(project_id, latest_rollout)
                                 ui.debug(
@@ -635,7 +653,8 @@ Do not create subdirectories unless specifically requested by the user.
                         if isinstance(session_data, dict) and "codex" in session_data:
                             codex_session = session_data["codex"]
                             ui.debug(
-                                f"Retrieved Codex session from DB: {codex_session}", "Codex"
+                                f"Retrieved Codex session from DB: {codex_session}",
+                                "Codex",
                             )
                             return codex_session
                     except (json.JSONDecodeError, TypeError):
@@ -768,9 +787,7 @@ Do not create subdirectories unless specifically requested by the user.
             # Use exact same logic as codex_chat.py _resolve_resume_path for "latest"
             root = Path.home() / ".codex" / "sessions"
             if not root.exists():
-                ui.debug(
-                    f"Codex sessions directory does not exist: {root}", "Codex"
-                )
+                ui.debug(f"Codex sessions directory does not exist: {root}", "Codex")
                 return None
 
             # Find all rollout files using same pattern as codex_chat.py
