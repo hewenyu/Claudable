@@ -141,11 +141,14 @@ async def get_global_settings() -> Dict[str, Any]:
 
 @router.put("/global")
 async def update_global_settings(settings: GlobalSettingsModel) -> Dict[str, Any]:
-    """글로벌 설정을 업데이트합니다."""
+    """Update global settings."""
     global GLOBAL_SETTINGS
 
-    GLOBAL_SETTINGS.update(
-        {"default_cli": settings.default_cli, "cli_settings": settings.cli_settings}
-    )
+    # Update the global settings dict
+    GLOBAL_SETTINGS = {
+        **GLOBAL_SETTINGS,
+        "default_cli": settings.default_cli,
+        "cli_settings": settings.cli_settings,
+    }
 
     return {"success": True, "settings": GLOBAL_SETTINGS}

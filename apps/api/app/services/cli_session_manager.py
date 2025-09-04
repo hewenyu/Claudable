@@ -196,7 +196,9 @@ class CLISessionManager:
         # Update sessions without cli_type
         updated_sessions = (
             self.db.query(ChatSession)
-            .filter(ChatSession.project_id == project_id, ChatSession.cli_type == None)
+            .filter(
+                ChatSession.project_id == project_id, ChatSession.cli_type.is_(None)
+            )
             .update({"cli_type": CLIType.CLAUDE.value})
         )
 
@@ -208,8 +210,8 @@ class CLISessionManager:
             self.db.query(Message)
             .filter(
                 Message.project_id == project_id,
-                Message.cli_source == None,
-                Message.metadata_json != None,
+                Message.cli_source.is_(None),
+                Message.metadata_json.is_not(None),
             )
             .all()
         )

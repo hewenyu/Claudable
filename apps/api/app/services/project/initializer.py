@@ -271,12 +271,14 @@ async def parse_and_update_project_metadata(project_id: str, db_session) -> dict
 
             db_session.commit()
             from app.core.terminal_ui import ui
+
             ui.success(f"Updated project {project_id} with metadata", "Project")
 
         return metadata
 
     except Exception as e:
         from app.core.terminal_ui import ui
+
         ui.error(f"Failed to parse metadata for project {project_id}: {e}", "Project")
         raise
 

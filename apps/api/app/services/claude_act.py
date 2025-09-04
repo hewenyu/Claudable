@@ -286,7 +286,7 @@ async def generate_diff_with_logging(
                                         or "modified" in content_str.lower()
                                     ):
                                         diff_info = content_str
-                                except:
+                                except Exception:
                                     pass
 
                             await log_callback(

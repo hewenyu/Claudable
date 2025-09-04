@@ -250,7 +250,7 @@ async def get_active_requests(project_id: str, db: Session = Depends(get_db)):
     active_count = (
         db.query(UserRequest)
         .filter(UserRequest.project_id == project_id)
-        .filter(UserRequest.is_completed == False)
+        .filter(UserRequest.is_completed.is_(False))
         .count()
     )
 

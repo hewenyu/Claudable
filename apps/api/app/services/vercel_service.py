@@ -129,7 +129,7 @@ class VercelService:
                             error_msg = error_data.get("error", {}).get(
                                 "message", "Unknown error"
                             )
-                        except:
+                        except Exception:
                             error_msg = await response.text()
                         raise VercelAPIError(
                             f"Failed to get project: {error_msg}", response.status
@@ -243,7 +243,7 @@ class VercelService:
                             error_msg = error_data.get("error", {}).get(
                                 "message", "Unknown error"
                             )
-                        except:
+                        except Exception:
                             error_msg = await response.text()
                         raise VercelAPIError(
                             f"Failed to get deployment: {error_msg}", response.status
@@ -282,7 +282,7 @@ async def check_project_availability(
                         error_msg = error_data.get("error", {}).get(
                             "message", "Unknown error"
                         )
-                    except:
+                    except Exception:
                         error_msg = await response.text()
 
                     if response.status == 401:
@@ -371,7 +371,7 @@ async def monitor_deployment_status(
                 # 완료 상태 체크 - ready 필드도 확인
                 is_ready = (
                     status_data["status"] == "READY"
-                    or status_data.get("ready") == True
+                    or status_data.get("ready") is True
                     or status_data.get("readyState") == "READY"
                 )
                 is_error = status_data["status"] == "ERROR"
