@@ -50,6 +50,12 @@ class Settings(BaseModel):
         os.getenv("PROJECTS_ROOT", str(PROJECT_ROOT / "data" / "projects")),
     )
 
+    # Local Git projects management
+    local_git_projects_root: str = os.getenv(
+        "LOCAL_GIT_PROJECTS_ROOT", 
+        os.path.expanduser("~/code/github")
+    )
+
     preview_port_start: int = int(os.getenv("PREVIEW_PORT_START", "3100"))
     preview_port_end: int = int(os.getenv("PREVIEW_PORT_END", "3999"))
 

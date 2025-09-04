@@ -211,7 +211,11 @@ node_modules/
         try:
             # Change to project directory
             original_cwd = os.getcwd()
-            os.chdir(project_path)
+            if project_path and os.path.exists(project_path):
+                os.chdir(project_path)
+            else:
+                ui.warning(f"Project path not found or None: {project_path}, using current directory", "Claude SDK")
+                project_path = original_cwd
 
             # Get project ID for session management
             project_id = (

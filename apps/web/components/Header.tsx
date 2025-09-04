@@ -2,8 +2,10 @@
 import { useState } from 'react';
 import ProjectSettings from '@/components/ProjectSettings';
 import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 import Image from 'next/image';
 import { useTheme } from '@/components/ThemeProvider';
+import { FolderGit2 } from 'lucide-react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
 
@@ -17,6 +19,7 @@ export default function Header() {
   // Hide header on chat pages and main page (main page has its own header)
   const isChatPage = pathname.includes('/chat');
   const isMainPage = pathname === '/';
+  const isLocalProjectsPage = pathname === '/local-projects';
   const theme = useTheme();
   
   if (isChatPage || isMainPage) {
@@ -50,7 +53,17 @@ export default function Header() {
                 priority
               />
             </div>
-            <nav className="flex items-center gap-3" />
+            <nav className="flex items-center gap-3">
+              {!isLocalProjectsPage && (
+                <Link
+                  href="/local-projects"
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200"
+                >
+                  <FolderGit2 className="w-4 h-4" />
+                  Local Projects
+                </Link>
+              )}
+            </nav>
           </div>
           <div className="flex items-center gap-3">
             {/* 글로벌 설정 */}

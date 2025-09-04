@@ -28,6 +28,10 @@ class Project(Base):
     branches: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     current_branch: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_local_repo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    
+    # Local Git project association
+    local_git_project_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    local_git_project_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
 
     # Multi-CLI Session Management
     active_claude_session_id: Mapped[str | None] = mapped_column(

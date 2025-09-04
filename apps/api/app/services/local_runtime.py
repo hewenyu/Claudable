@@ -329,6 +329,12 @@ def start_preview_process(
     port = port or find_free_preview_port()
     process_name = f"next-dev-{project_id}"
 
+    # Check if repo_path is valid
+    if not repo_path:
+        raise RuntimeError(f"Repository path is None for project {project_id}")
+    if not os.path.exists(repo_path):
+        raise RuntimeError(f"Repository path does not exist: {repo_path}")
+    
     # Check if project has package.json
     package_json_path = os.path.join(repo_path, "package.json")
     if not os.path.exists(package_json_path):

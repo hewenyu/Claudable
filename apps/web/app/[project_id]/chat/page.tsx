@@ -168,6 +168,14 @@ export default function ChatPage({ params }: Params) {
   const [projectName, setProjectName] = useState<string>('');
   const [projectDescription, setProjectDescription] = useState<string>('');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  
+  // Workspace/Git branch management state
+  const [isWorkspace, setIsWorkspace] = useState<boolean>(false);
+  const [currentBranch, setCurrentBranch] = useState<string>('');
+  const [availableBranches, setAvailableBranches] = useState<string[]>([]);
+  const [switchingBranch, setSwitchingBranch] = useState<boolean>(false);
+  const [showBranchDropdown, setShowBranchDropdown] = useState<boolean>(false);
+  
   const [tree, setTree] = useState<Entry[]>([]);
   const [content, setContent] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<string>('');
@@ -842,6 +850,13 @@ export default function ChatPage({ params }: Params) {
         });
         setProjectName(project.name || `Project ${projectId.slice(0, 8)}`);
         
+        // Check if this is a workspace (has local_git_project_name)
+        if (project.local_git_project_name) {
+          setIsWorkspace(true);
+          setCurrentBranch(project.current_branch || 'main');
+          await loadWorkspaceBranches();
+        }
+        
         // Set CLI and model from project settings if available
         if (project.preferred_cli) {
           console.log('✅ Setting CLI from project:', project.preferred_cli);
@@ -914,6 +929,53 @@ export default function ChatPage({ params }: Params) {
       setIsInitializing(false);
       setUsingGlobalDefaults(true);
       return {}; // Return empty object on error
+    }
+  }
+
+  // Workspace branch management functions
+  async function loadWorkspaceBranches() {
+    if (!isWorkspace) return;
+    
+    try {
+      const response = await fetch(`${API_BASE}/api/workspace/${projectId}/branches`);
+      if (response.ok) {
+        const branches = await response.json();
+        setAvailableBranches(branches);
+      }
+    } catch (error) {
+      console.error('Failed to load workspace branches:', error);
+    }
+  }
+
+  async function switchBranch(branchName: string) {
+    if (!isWorkspace || switchingBranch) return;
+    
+    setSwitchingBranch(true);
+    try {
+      const response = await fetch(`${API_BASE}/api/workspace/${projectId}/switch-branch?branch_name=${encodeURIComponent(branchName)}`, {
+        method: 'POST'
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        setCurrentBranch(branchName);
+        setShowBranchDropdown(false);
+        
+        // Reload file tree to reflect branch changes
+        await load();
+        
+        // Show success toast
+        console.log('✅ Branch switched successfully:', result.message);
+      } else {
+        const error = await response.json().catch(() => ({ detail: 'Failed to switch branch' }));
+        console.error('❌ Branch switch failed:', error.detail);
+        alert(`Failed to switch branch: ${error.detail}`);
+      }
+    } catch (error) {
+      console.error('❌ Branch switch error:', error);
+      alert('Failed to switch branch. Please try again.');
+    } finally {
+      setSwitchingBranch(false);
     }
   }
 
@@ -1308,6 +1370,23 @@ export default function ChatPage({ params }: Params) {
     }
   }, [globalSettings, usingGlobalDefaults]);
 
+  // Handle click outside for branch dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showBranchDropdown) {
+        const target = event.target as Element;
+        if (!target.closest('[data-branch-dropdown]')) {
+          setShowBranchDropdown(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showBranchDropdown]);
+
 
   // Show loading UI if project is initializing
 
@@ -1441,6 +1520,57 @@ export default function ChatPage({ params }: Params) {
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       {projectDescription}
                     </p>
+                  )}
+                  {/* Git Branch Selector for Workspaces */}
+                  {isWorkspace && currentBranch && (
+                    <div className="mt-2 relative" data-branch-dropdown>
+                      <button
+                        onClick={() => setShowBranchDropdown(!showBranchDropdown)}
+                        disabled={switchingBranch}
+                        className="flex items-center gap-2 px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-md hover:bg-blue-200 dark:hover:bg-blue-900/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Switch branch"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M6 3v12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M18 9a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M6 21a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M15 7v4.5a3.5 3.5 0 0 1-7 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        <span>{switchingBranch ? 'Switching...' : currentBranch}</span>
+                        {!switchingBranch && (
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </button>
+                      
+                      {/* Branch Dropdown */}
+                      {showBranchDropdown && availableBranches.length > 0 && (
+                        <div className="absolute top-full left-0 mt-1 z-50 min-w-[150px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                          {availableBranches.map((branch) => (
+                            <button
+                              key={branch}
+                              onClick={() => switchBranch(branch)}
+                              disabled={switchingBranch || branch === currentBranch}
+                              className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                                branch === currentBranch 
+                                  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium' 
+                                  : 'text-gray-700 dark:text-gray-300'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                {branch === currentBranch && (
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                )}
+                                <span>{branch}</span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
