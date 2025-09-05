@@ -15,7 +15,13 @@ if settings.database_url.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
 
 engine = create_engine(
-    settings.database_url, connect_args=connect_args, pool_pre_ping=True
+    settings.database_url,
+    connect_args=connect_args,
+    pool_pre_ping=True,
+    pool_size=10,              # Connection pool size
+    max_overflow=20,           # Maximum overflow connections
+    pool_recycle=3600,         # Connection recycle time (1 hour)
+    echo=False                 # Disable SQL logging in production
 )
 
 # Enable foreign key constraints for SQLite
