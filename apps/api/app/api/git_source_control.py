@@ -65,7 +65,12 @@ def run_git_command(cwd: str, *args) -> tuple[bool, str]:
             text=True,
             timeout=30
         )
-        return result.returncode == 0, result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
+        # Only strip trailing whitespace, preserve leading spaces for git status --porcelain
+        if result.returncode == 0:
+            output = result.stdout.rstrip('\n\r')
+        else:
+            output = result.stderr.strip()
+        return result.returncode == 0, output
     except subprocess.TimeoutExpired:
         return False, "Git command timed out"
     except Exception as e:
