@@ -128,7 +128,7 @@ class TestCLISessionManager:
             }
         }
         
-        result = manager.clear_session("test-project", CLIType.CLAUDE)
+        result = manager.clear_session_id("test-project", CLIType.CLAUDE)
         assert result is True
         
         # Verify session was cleared in database
@@ -142,7 +142,7 @@ class TestCLISessionManager:
         """Test clearing session for non-existent project"""
         manager = CLISessionManager(test_db_session)
         
-        result = manager.clear_session("non-existent", CLIType.CLAUDE)
+        result = manager.clear_session_id("non-existent", CLIType.CLAUDE)
         assert result is False
 
     def test_has_active_session_true(self, test_db_session: Session):
@@ -158,8 +158,8 @@ class TestCLISessionManager:
         
         manager = CLISessionManager(test_db_session)
         
-        result = manager.has_active_session("test-project", CLIType.CLAUDE)
-        assert result is True
+        result = manager.get_session_id("test-project", CLIType.CLAUDE)
+        assert result == "active-session"
 
     def test_has_active_session_false(self, test_db_session: Session):
         """Test checking for active session when it doesn't exist"""
@@ -174,8 +174,8 @@ class TestCLISessionManager:
         
         manager = CLISessionManager(test_db_session)
         
-        result = manager.has_active_session("test-project", CLIType.CLAUDE)
-        assert result is False
+        result = manager.get_session_id("test-project", CLIType.CLAUDE)
+        assert result is None
 
     def test_get_all_sessions(self, test_db_session: Session):
         """Test getting all sessions for a project"""
@@ -230,7 +230,7 @@ class TestCLISessionManager:
         assert cached_session == "updated-session"
         
         # Clear session
-        manager.clear_session("test-project", CLIType.CLAUDE)
+        manager.clear_session_id("test-project", CLIType.CLAUDE)
         
         # Verify cache was cleared
         cached_session = manager._session_cache["test-project"][CLIType.CLAUDE]
