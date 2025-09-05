@@ -21,6 +21,7 @@ from app.api.tokens import router as tokens_router
 from app.api.vercel import router as vercel_router
 from app.api.workspace import router as workspace_router
 from app.core.logging import configure_logging
+from app.core.config import settings
 from app.core.terminal_ui import ui
 from app.db.base import Base
 from app.db.migrations import run_sqlite_migrations
@@ -52,12 +53,12 @@ class LogFilterMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(LogFilterMiddleware)
 
-# Basic CORS for local development - support multiple ports
+# Enhanced CORS for security - configurable origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins in development
+    allow_origins=settings.cors_origins,  # Secure origins list
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
 

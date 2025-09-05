@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 def find_project_root() -> Path:
@@ -58,6 +58,45 @@ class Settings(BaseModel):
 
     preview_port_start: int = int(os.getenv("PREVIEW_PORT_START", "3100"))
     preview_port_end: int = int(os.getenv("PREVIEW_PORT_END", "3999"))
+
+    # Security settings
+    cors_origins: list[str] = [
+        "http://localhost:3000",    # Development frontend
+        "http://localhost:3001",    # Alternative dev port
+        "http://127.0.0.1:3000",    # Alternative localhost
+        "http://127.0.0.1:3001",    # Alternative localhost port
+    ]
+    
+    # Environment validation flags
+    anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
+    debug: bool = os.getenv("DEBUG", "false").lower() == "true"
+    
+    @field_validator('anthropic_api_key')
+    @classmethod
+    def validate_anthropic_api_key(cls, v):
+        """Validate Anthropic API key is set for production."""
+        if not v or v == "your_anthropic_api_key_here":
+            import warnings
+            warnings.warn(
+                "ANTHROPIC_API_KEY not properly configured. "
+                "Claude Code functionality will be limited.",
+                UserWarning
+            )
+        return v
+    
+    @field_validator('database_url')
+    @classmethod
+    def validate_database_url(cls, v):
+        """Validate database URL format."""
+        if not v:
+            raise ValueError("DATABASE_URL cannot be empty")
+        return v
+    
+    # Allow environment override for CORS origins
+    def __init__(self, **data):
+        super().__init__(**data)
+        if cors_env := os.getenv("CORS_ORIGINS"):
+            self.cors_origins = [origin.strip() for origin in cors_env.split(",")]
 
 
 settings = Settings()

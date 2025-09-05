@@ -7,9 +7,12 @@ helpers so that adding a new provider remains consistent and easy.
 
 from __future__ import annotations
 
+import asyncio
 import os
+import time
 import uuid
 from abc import ABC, abstractmethod
+from contextlib import asynccontextmanager
 from datetime import datetime
 from enum import Enum
 from typing import Any, AsyncGenerator, Callable, Dict, List, Optional
@@ -113,6 +116,30 @@ class CLIType(str, Enum):
     GEMINI = "gemini"
 
 
+class CLIErrorType(Enum):
+    """Standard error types for CLI operations."""
+    CONNECTION_ERROR = "connection_error"
+    AUTHENTICATION_ERROR = "auth_error"
+    COMMAND_ERROR = "command_error"
+    TIMEOUT_ERROR = "timeout_error"
+    VALIDATION_ERROR = "validation_error"
+
+
+class CLIError(Exception):
+    """Standard CLI error with categorization."""
+    
+    def __init__(
+        self,
+        error_type: CLIErrorType,
+        message: str,
+        details: Optional[Dict[str, Any]] = None
+    ):
+        self.error_type = error_type
+        self.message = message
+        self.details = details or {}
+        super().__init__(message)
+
+
 class BaseCLI(ABC):
     """Abstract adapter contract for CLI providers.
 
@@ -156,6 +183,99 @@ class BaseCLI(ABC):
     @abstractmethod
     async def set_session_id(self, project_id: str, session_id: str) -> None:
         """Persist the active session ID for a project."""
+
+    # ---- Enhanced common utilities with error handling ------------------
+    
+    @asynccontextmanager
+    async def track_performance(self, command_summary: str):
+        """Track and log CLI operation performance."""
+        start_time = time.time()
+        try:
+            yield
+        finally:
+            duration = time.time() - start_time
+            from app.core.terminal_ui import ui
+            ui.debug(
+                f"CLI Performance: {self.cli_type.value} '{command_summary}' took {duration:.2f}s",
+                "Performance"
+            )
+
+    async def execute_with_retry(
+        self,
+        operation: Callable[[], Any],
+        max_retries: int = 3,
+        operation_name: str = "CLI operation"
+    ) -> Any:
+        """Execute operation with exponential backoff retry logic."""
+        last_exception = None
+        
+        for attempt in range(max_retries):
+            try:
+                async with self.track_performance(f"{operation_name} (attempt {attempt + 1})"):
+                    return await operation()
+            except CLIError as e:
+                # Don't retry certain error types
+                if e.error_type in [CLIErrorType.AUTHENTICATION_ERROR, CLIErrorType.VALIDATION_ERROR]:
+                    raise
+                last_exception = e
+                if attempt < max_retries - 1:
+                    delay = 2 ** attempt  # Exponential backoff
+                    from app.core.terminal_ui import ui
+                    ui.warning(f"Retry {attempt + 1}/{max_retries} for {operation_name} after {delay}s delay", "Retry")
+                    await asyncio.sleep(delay)
+            except Exception as e:
+                last_exception = CLIError(
+                    CLIErrorType.COMMAND_ERROR,
+                    f"Unexpected error in {operation_name}: {str(e)}",
+                    {"original_error": str(e), "attempt": attempt + 1}
+                )
+                if attempt < max_retries - 1:
+                    delay = 2 ** attempt
+                    await asyncio.sleep(delay)
+        
+        # All retries exhausted
+        if last_exception:
+            raise last_exception
+        else:
+            raise CLIError(
+                CLIErrorType.COMMAND_ERROR,
+                f"All {max_retries} attempts failed for {operation_name}"
+            )
+
+    def validate_instruction(self, instruction: str) -> None:
+        """Validate instruction for security concerns."""
+        if not instruction or not instruction.strip():
+            raise CLIError(
+                CLIErrorType.VALIDATION_ERROR,
+                "Instruction cannot be empty"
+            )
+        
+        if len(instruction) > 50000:  # 50KB limit
+            raise CLIError(
+                CLIErrorType.VALIDATION_ERROR,
+                f"Instruction too long: {len(instruction)} characters (max 50000)"
+            )
+        
+        # Basic security checks
+        forbidden_patterns = [
+            'rm -rf /',
+            'sudo rm',
+            'mkfs.',
+            'dd if=',
+            'format c:',
+            '> /dev/',
+            'chmod 777',
+            'chown root',
+        ]
+        
+        instruction_lower = instruction.lower()
+        for pattern in forbidden_patterns:
+            if pattern in instruction_lower:
+                raise CLIError(
+                    CLIErrorType.VALIDATION_ERROR,
+                    f"Potentially dangerous pattern detected: {pattern}",
+                    {"pattern": pattern}
+                )
 
     # ---- Common helpers (available to adapters) --------------------------
     def _get_cli_model_name(self, model: Optional[str]) -> Optional[str]:

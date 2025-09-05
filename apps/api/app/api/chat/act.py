@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -36,12 +36,48 @@ class ImageAttachment(BaseModel):
 
 
 class ActRequest(BaseModel):
-    instruction: str
+    instruction: str = Field(..., min_length=1, max_length=50000, description="The instruction to execute")
     conversation_id: str | None = None
     cli_preference: str | None = None
     fallback_enabled: bool = True
     images: List[ImageAttachment] = []
     is_initial_prompt: bool = False
+
+    @field_validator('instruction')
+    @classmethod
+    def validate_instruction_security(cls, v):
+        """Validate instruction for security concerns."""
+        if not v or not v.strip():
+            raise ValueError("Instruction cannot be empty")
+        
+        # Basic security validation
+        forbidden_patterns = [
+            'rm -rf /',
+            'sudo rm',
+            'mkfs.',
+            'dd if=',
+            'format c:',
+            '> /dev/',
+            'chmod 777',
+            'chown root',
+        ]
+        
+        v_lower = v.lower()
+        for pattern in forbidden_patterns:
+            if pattern in v_lower:
+                raise ValueError(f"Potentially dangerous pattern detected: {pattern}")
+        
+        return v.strip()
+
+    @field_validator('cli_preference')
+    @classmethod
+    def validate_cli_preference(cls, v):
+        """Validate CLI preference is a known type."""
+        if v is not None:
+            valid_preferences = ['claude', 'cursor', 'codex', 'qwen', 'gemini']
+            if v not in valid_preferences:
+                raise ValueError(f"Invalid CLI preference. Must be one of: {', '.join(valid_preferences)}")
+        return v
 
 
 class ActResponse(BaseModel):
