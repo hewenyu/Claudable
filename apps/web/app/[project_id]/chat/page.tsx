@@ -221,6 +221,7 @@ export default function ChatPage({ params }: Params) {
   const [diffContent, setDiffContent] = useState<string | null>(null);
   const [isDiffView, setIsDiffView] = useState(false);
   const [diffFilePath, setDiffFilePath] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   // Guarded trigger that can be called from multiple places safely
   const triggerInitialPromptIfNeeded = useCallback(() => {
@@ -436,7 +437,8 @@ export default function ChatPage({ params }: Params) {
   async function start() {
     // Check if preview is supported before attempting to start
     if (supportsPreview === false) {
-      alert(`Preview not available: ${previewCheckReason}`);
+      setPreviewError(`Preview not available: ${previewCheckReason}`);
+      setTimeout(() => setPreviewError(null), 5000); // Clear error after 5 seconds
       return;
     }
     
@@ -456,7 +458,8 @@ export default function ChatPage({ params }: Params) {
         
         // Show user-friendly error message
         if (errorText.includes('Preview not available')) {
-          alert(errorText);
+          setPreviewError(errorText);
+          setTimeout(() => setPreviewError(null), 5000);
           // Update preview support status
           setSupportsPreview(false);
           const reasonMatch = errorText.match(/Preview not available: (.+?)\./);
@@ -465,6 +468,8 @@ export default function ChatPage({ params }: Params) {
           }
         } else {
           setPreviewInitializationMessage('Failed to start preview');
+          setPreviewError('Failed to start preview server. Please try again.');
+          setTimeout(() => setPreviewError(null), 5000);
         }
         
         setTimeout(() => setIsStartingPreview(false), 2000);
@@ -481,6 +486,8 @@ export default function ChatPage({ params }: Params) {
     } catch (error) {
       console.error('Error starting preview:', error);
       setPreviewInitializationMessage('An error occurred');
+      setPreviewError('An error occurred while starting the preview server.');
+      setTimeout(() => setPreviewError(null), 5000);
       setTimeout(() => setIsStartingPreview(false), 2000);
     }
   }
@@ -654,7 +661,7 @@ export default function ChatPage({ params }: Params) {
   }
 
   // Handle viewing diffs from Git source control
-  async function handleViewDiff(filePath: string, staged: boolean) {
+  const handleViewDiff = useCallback(async (filePath: string, staged: boolean) => {
     try {
       const response = await fetch(`${API_BASE}/api/projects/${projectId}/git/diff/${encodeURIComponent(filePath)}?staged=${staged}`);
       
@@ -688,7 +695,7 @@ export default function ChatPage({ params }: Params) {
       setDiffFilePath(filePath);
       setSelectedFile(filePath);
     }
-  }
+  }, [projectId]);
 
   // Reload currently selected file
   async function reloadCurrentFile() {
@@ -1066,7 +1073,7 @@ export default function ChatPage({ params }: Params) {
         setShowBranchDropdown(false);
         
         // Reload file tree to reflect branch changes
-        await load();
+        await loadTree('.');
         
         // Show success toast
         console.log('✅ Branch switched successfully:', result.message);
@@ -1197,6 +1204,11 @@ export default function ChatPage({ params }: Params) {
       // 완료 후 데이터 새로고침
       await loadTree('.');
       
+      // Force explorer refresh after task completion
+      setTimeout(() => {
+        loadTree('.');
+      }, 1000); // Additional refresh after 1 second to catch any delayed file changes
+      
       // 프롬프트 및 업로드된 이미지들 초기화
       setPrompt('');
       // Clean up old format images if any
@@ -1313,6 +1325,9 @@ export default function ChatPage({ params }: Params) {
       // ★ NEW: UserRequest 생성 (display original prompt, not enhanced)
       createRequest(requestId, result.session_id, initialPrompt, 'act');
       
+      // Refresh file tree after initial prompt
+      await loadTree('.');
+      
       // Clear the prompt input after sending
       setPrompt('');
       
@@ -1383,7 +1398,7 @@ export default function ChatPage({ params }: Params) {
     previousActiveState.current = hasActiveRequests;
   }, [hasActiveRequests, previewUrl]);
 
-  // Poll for file changes in code view
+  // Poll for file changes in code view AND explorer refresh
   useEffect(() => {
     if (!showPreview && selectedFile) {
       const interval = setInterval(() => {
@@ -1393,6 +1408,15 @@ export default function ChatPage({ params }: Params) {
       return () => clearInterval(interval);
     }
   }, [showPreview, selectedFile, projectId]);
+
+  // Auto-refresh file explorer every 10 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadTree('.');
+    }, 10000); // Refresh every 10 seconds
+
+    return () => clearInterval(interval);
+  }, [projectId]);
 
 
   useEffect(() => { 
@@ -1698,6 +1722,12 @@ export default function ChatPage({ params }: Params) {
                     // Initial prompt 작업 완료 후 자동으로 preview 서버 시작
                     start();
                   }
+                  // Refresh file explorer when task completes
+                  if (!isRunningValue) {
+                    setTimeout(() => {
+                      loadTree('.');
+                    }, 500); // Refresh after task completion
+                  }
                 }}
                 onProjectStatusUpdate={handleProjectStatusUpdate}
                 startRequest={startRequest}
@@ -1895,7 +1925,7 @@ export default function ChatPage({ params }: Params) {
                           <div className="mb-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
                             <p className="text-sm font-medium text-green-700 dark:text-green-400 mb-2">Currently published at:</p>
                             <a 
-                              href={publishedUrl} 
+                              href={publishedUrl || ''} 
                               target="_blank" 
                               rel="noopener noreferrer" 
                               className="text-sm text-green-600 dark:text-green-300 font-mono hover:underline break-all"
@@ -2042,6 +2072,31 @@ export default function ChatPage({ params }: Params) {
               
               {/* Content Area */}
               <div className="flex-1 relative bg-black overflow-hidden">
+                {/* Preview Error Notification */}
+                {previewError && (
+                  <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 max-w-md">
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-4 py-3 shadow-lg">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 mt-0.5">
+                          <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-red-800 dark:text-red-200">{previewError}</p>
+                        </div>
+                        <button
+                          onClick={() => setPreviewError(null)}
+                          className="flex-shrink-0 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-200"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <AnimatePresence mode="wait">
                   {showPreview ? (
                   <MotionDiv
@@ -2375,6 +2430,16 @@ export default function ChatPage({ params }: Params) {
                         <span className="hidden sm:inline">Git</span>
                       </div>
                     </button>
+                    {/* Refresh Button */}
+                    {sidebarTab === 'explorer' && (
+                      <button
+                        onClick={() => loadTree('.')}
+                        className="px-2 py-2 text-[11px] font-medium text-gray-600 dark:text-[#6a6a6a] hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-[#1a1a1a] transition-colors"
+                        title="Refresh Explorer"
+                      >
+                        <FaSync className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
 
                   {/* Tab Content */}
@@ -2539,7 +2604,7 @@ export default function ChatPage({ params }: Params) {
                 <div className="p-4 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20">
                   <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400 mb-2">Published successfully</p>
                   <div className="flex items-center gap-2">
-                    <a href={publishedUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-mono text-emerald-700 dark:text-emerald-300 underline break-all flex-1">
+                    <a href={publishedUrl || ''} target="_blank" rel="noopener noreferrer" className="text-sm font-mono text-emerald-700 dark:text-emerald-300 underline break-all flex-1">
                       {publishedUrl}
                     </a>
                     <button
