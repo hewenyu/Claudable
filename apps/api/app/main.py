@@ -4,6 +4,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.api.projects import router as projects_router
 from app.api.repo import router as repo_router
 from app.api.commits import router as commits_router
+from app.api.git import router as git_router
 from app.api.env import router as env_router
 from app.api.assets import router as assets_router
 from app.api.chat import router as chat_router
@@ -57,6 +58,7 @@ app.add_middleware(
 app.include_router(projects_router, prefix="/api/projects")
 app.include_router(repo_router)
 app.include_router(commits_router)
+app.include_router(git_router)
 app.include_router(env_router)
 app.include_router(assets_router)
 app.include_router(chat_router, prefix="/api/chat")  # Unified chat API (includes WebSocket and ACT)

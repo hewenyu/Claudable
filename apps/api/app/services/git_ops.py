@@ -171,3 +171,122 @@ def commit_all(repo_path: str, message: str) -> dict:
             "error": str(e),
             "message": message
         }
+
+
+def get_status(repo_path: str) -> dict:
+    """Get git status information"""
+    try:
+        # Get status in porcelain format for easier parsing
+        result = _run(["git", "status", "--porcelain"], cwd=repo_path)
+        
+        modified = []
+        staged = []
+        untracked = []
+        
+        for line in result.splitlines():
+            if len(line) < 3:
+                continue
+            
+            status_code = line[:2]
+            file_path = line[3:]
+            
+            # Parse status codes
+            # First character: index status, Second character: working tree status
+            index_status = status_code[0]
+            working_status = status_code[1]
+            
+            if index_status == '?':
+                untracked.append(file_path)
+            elif index_status in ['A', 'M', 'D', 'R', 'C']:
+                staged.append(file_path)
+            
+            if working_status in ['M', 'D']:
+                modified.append(file_path)
+        
+        return {
+            "modified": modified,
+            "staged": staged,
+            "untracked": untracked
+        }
+    except subprocess.CalledProcessError:
+        return {
+            "modified": [],
+            "staged": [],
+            "untracked": []
+        }
+
+
+def get_file_diff(repo_path: str, file_path: str, staged: bool = False) -> str:
+    """Get diff for a specific file"""
+    try:
+        if staged:
+            # Diff between index and HEAD (staged changes)
+            return _run(["git", "diff", "--cached", file_path], cwd=repo_path)
+        else:
+            # Diff between working directory and index (unstaged changes)
+            return _run(["git", "diff", file_path], cwd=repo_path)
+    except subprocess.CalledProcessError:
+        return ""
+
+
+def stage_file(repo_path: str, file_path: str) -> dict:
+    """Stage a specific file"""
+    try:
+        _run(["git", "add", file_path], cwd=repo_path)
+        return {"success": True}
+    except subprocess.CalledProcessError as e:
+        return {"success": False, "error": str(e)}
+
+
+def unstage_file(repo_path: str, file_path: str) -> dict:
+    """Unstage a specific file"""
+    try:
+        _run(["git", "reset", "HEAD", file_path], cwd=repo_path)
+        return {"success": True}
+    except subprocess.CalledProcessError as e:
+        return {"success": False, "error": str(e)}
+
+
+def discard_changes(repo_path: str, file_path: str) -> dict:
+    """Discard changes in working directory for a specific file"""
+    try:
+        _run(["git", "checkout", "HEAD", file_path], cwd=repo_path)
+        return {"success": True}
+    except subprocess.CalledProcessError as e:
+        return {"success": False, "error": str(e)}
+
+
+def stage_all(repo_path: str) -> dict:
+    """Stage all changes"""
+    try:
+        _run(["git", "add", "-A"], cwd=repo_path)
+        return {"success": True}
+    except subprocess.CalledProcessError as e:
+        return {"success": False, "error": str(e)}
+
+
+def unstage_all(repo_path: str) -> dict:
+    """Unstage all changes"""
+    try:
+        _run(["git", "reset", "HEAD"], cwd=repo_path)
+        return {"success": True}
+    except subprocess.CalledProcessError as e:
+        return {"success": False, "error": str(e)}
+
+
+def commit_staged(repo_path: str, message: str) -> dict:
+    """Commit only staged changes"""
+    try:
+        _run(["git", "commit", "-m", message], cwd=repo_path)
+        commit_sha = current_head(repo_path)
+        return {
+            "success": True,
+            "commit_hash": commit_sha,
+            "message": message
+        }
+    except subprocess.CalledProcessError as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": message
+        }

@@ -8,6 +8,8 @@ import { FaCode, FaDesktop, FaMobileAlt, FaPlay, FaStop, FaSync, FaCog, FaRocket
 import { SiTypescript, SiGo, SiRuby, SiSvelte, SiJson, SiYaml, SiCplusplus } from 'react-icons/si';
 import { VscJson } from 'react-icons/vsc';
 import ChatLog from '../../../components/ChatLog';
+import GitView from '../../../components/GitView';
+import GitDiffView from '../../../components/GitDiffView';
 import { ProjectSettings } from '../../../components/settings/ProjectSettings';
 import ChatInput from '../../../components/chat/ChatInput';
 import { useUserRequests } from '../../../hooks/useUserRequests';
@@ -178,6 +180,9 @@ export default function ChatPage({ params }: Params) {
   const [mode, setMode] = useState<'act' | 'chat'>('act');
   const [isRunning, setIsRunning] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
+  const [viewMode, setViewMode] = useState<'preview' | 'code' | 'git'>('preview');
+  const [gitSelectedFile, setGitSelectedFile] = useState<string>('');
+  const [gitSelectedFileStaged, setGitSelectedFileStaged] = useState<boolean>(false);
   const [deviceMode, setDeviceMode] = useState<'desktop'|'mobile'>('desktop');
   const [showGlobalSettings, setShowGlobalSettings] = useState(false);
   const [uploadedImages, setUploadedImages] = useState<{name: string, url: string, base64: string}[]>([]);
@@ -1495,32 +1500,51 @@ export default function ChatPage({ params }: Params) {
               {/* Controls Bar */}
               <div className="bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 px-4 h-[73px] flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  {/* 토글 스위치 */}
+                  {/* 토글 스위치 - 3 modes */}
                   <div className="flex items-center bg-gray-100 dark:bg-gray-900 rounded-lg p-1">
                     <button
                       className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                        showPreview 
+                        viewMode === 'preview'
                           ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white' 
                           : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                       }`}
-                      onClick={() => setShowPreview(true)}
+                      onClick={() => {
+                        setViewMode('preview');
+                        setShowPreview(true);
+                      }}
                     >
                       <span className="w-4 h-4 flex items-center justify-center"><FaDesktop size={16} /></span>
                     </button>
                     <button
                       className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                        !showPreview 
+                        viewMode === 'code'
                           ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white' 
                           : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                       }`}
-                      onClick={() => setShowPreview(false)}
+                      onClick={() => {
+                        setViewMode('code');
+                        setShowPreview(false);
+                      }}
                     >
                       <span className="w-4 h-4 flex items-center justify-center"><FaCode size={16} /></span>
+                    </button>
+                    <button
+                      className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                        viewMode === 'git'
+                          ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white' 
+                          : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                      }`}
+                      onClick={() => {
+                        setViewMode('git');
+                        setShowPreview(false);
+                      }}
+                    >
+                      <span className="w-4 h-4 flex items-center justify-center"><FaGitAlt size={16} /></span>
                     </button>
                   </div>
                   
                   {/* Center Controls */}
-                  {showPreview && previewUrl && (
+                  {viewMode === 'preview' && previewUrl && (
                     <div className="flex items-center gap-3">
                       {/* Route Navigation */}
                       <div className="h-9 flex items-center bg-gray-100 dark:bg-gray-900 rounded-lg px-3 border border-gray-200 dark:border-gray-700">
@@ -1607,7 +1631,7 @@ export default function ChatPage({ params }: Params) {
                   </button>
                   
                   {/* Stop Button */}
-                  {showPreview && previewUrl && (
+                  {viewMode === 'preview' && previewUrl && (
                     <button 
                       className="h-9 px-3 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                       onClick={stop}
@@ -1618,7 +1642,7 @@ export default function ChatPage({ params }: Params) {
                   )}
                   
                   {/* Publish/Update */}
-                  {showPreview && previewUrl && (
+                  {viewMode === 'preview' && previewUrl && (
                     <div className="relative">
                     <button
                       className="h-9 flex items-center gap-2 px-3 bg-black text-white rounded-lg text-sm font-medium transition-colors hover:bg-gray-900 border border-black/10 dark:border-white/10 shadow-sm"
@@ -1800,7 +1824,7 @@ export default function ChatPage({ params }: Params) {
               {/* Content Area */}
               <div className="flex-1 relative bg-black overflow-hidden">
                 <AnimatePresence mode="wait">
-                  {showPreview ? (
+                  {viewMode === 'preview' ? (
                   <MotionDiv
                     key="preview"
                     initial={{ opacity: 0 }}
@@ -2080,7 +2104,7 @@ export default function ChatPage({ params }: Params) {
                   </div>
                 )}
                   </MotionDiv>
-                ) : (
+                ) : viewMode === 'code' ? (
               <MotionDiv
                 key="code"
                 initial={{ opacity: 0 }}
@@ -2188,6 +2212,50 @@ export default function ChatPage({ params }: Params) {
                   )}
                 </div>
               </MotionDiv>
+                ) : (
+                  /* Git view */
+                  <MotionDiv
+                    key="git" 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="h-full flex bg-white dark:bg-gray-950"
+                  >
+                    {/* Left Sidebar - Git View */}
+                    <div className="w-64 flex-shrink-0 bg-gray-50 dark:bg-[#0a0a0a] border-r border-gray-200 dark:border-[#1a1a1a]">
+                      <GitView 
+                        projectId={projectId}
+                        onFileSelect={(path: string, isStaged?: boolean) => {
+                          setGitSelectedFile(path);
+                          setGitSelectedFileStaged(isStaged || false);
+                        }}
+                        selectedFile={gitSelectedFile}
+                      />
+                    </div>
+
+                    {/* Right side - Git Diff View */}
+                    <div className="flex-1 bg-white dark:bg-[#0d0d0d]">
+                      {gitSelectedFile ? (
+                        <GitDiffView 
+                          projectId={projectId}
+                          filePath={gitSelectedFile}
+                          isStaged={gitSelectedFileStaged}
+                        />
+                      ) : (
+                        <div className="h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
+                          <div className="text-center">
+                            <span className="w-16 h-16 mb-4 opacity-30 text-gray-400 dark:text-gray-500 mx-auto flex items-center justify-center"><FaGitAlt size={64} /></span>
+                            <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              Git Source Control
+                            </h3>
+                            <p className="text-sm">
+                              Select a file from the changes panel to view its diff
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </MotionDiv>
                 )}
                 </AnimatePresence>
               </div>
