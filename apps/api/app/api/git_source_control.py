@@ -107,20 +107,10 @@ def get_git_status(repo_path: str) -> GitStatusResponse:
         if " -> " in file_path:
             file_path = file_path.split(" -> ")[1]  # Use new name
         
-        # Determine file status
-        if index_status != ' ':
-            # File is staged
-            status_char = index_status
-            staged = True
-            staged_files.append(GitFileStatus(
-                path=file_path,
-                status=status_char,
-                staged=True
-            ))
-        
+        # Determine file status - follow VS Code behavior
+        # Priority: Working tree changes > Staged changes (to avoid duplication)
         if worktree_status != ' ':
-            # File has working tree changes
-            status_char = worktree_status
+            # File has working tree changes - show in Changes section
             if worktree_status == '?':
                 # Untracked file
                 untracked_files.append(GitFileStatus(
@@ -129,12 +119,21 @@ def get_git_status(repo_path: str) -> GitStatusResponse:
                     staged=False
                 ))
             else:
-                # Modified file
+                # Modified file (may also have staged changes, but show in Changes)
+                # Use compound status if both staged and unstaged changes exist
+                status_char = f"{index_status}{worktree_status}" if index_status != ' ' else worktree_status
                 modified_files.append(GitFileStatus(
                     path=file_path,
                     status=status_char,
                     staged=False
                 ))
+        elif index_status != ' ':
+            # File is staged with no working tree changes
+            staged_files.append(GitFileStatus(
+                path=file_path,
+                status=index_status,
+                staged=True
+            ))
     
     # Get ahead/behind information
     ahead = 0

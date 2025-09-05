@@ -161,13 +161,25 @@ const GitSourceControl: React.FC<GitSourceControlProps> = ({ projectId, isVisibl
 
   // Get file status icon
   const getFileStatusIcon = (status: string) => {
+    // Handle compound statuses (e.g., "MM" for staged + unstaged changes)
+    if (status.length === 2) {
+      const [staged, unstaged] = status;
+      return (
+        <span className="flex items-center gap-0.5">
+          <span className="text-xs text-blue-500" title="Staged changes">{staged}</span>
+          <span className="text-xs text-orange-500" title="Unstaged changes">{unstaged}</span>
+        </span>
+      );
+    }
+    
+    // Single character statuses
     switch (status) {
-      case 'M': return <span className="text-orange-500">M</span>;
-      case 'A': return <span className="text-green-500">A</span>;
-      case 'D': return <span className="text-red-500">D</span>;
-      case 'R': return <span className="text-blue-500">R</span>;
-      case 'U': return <span className="text-gray-500">U</span>;
-      default: return <span className="text-gray-400">{status}</span>;
+      case 'M': return <span className="text-orange-500" title="Modified">M</span>;
+      case 'A': return <span className="text-green-500" title="Added">A</span>;
+      case 'D': return <span className="text-red-500" title="Deleted">D</span>;
+      case 'R': return <span className="text-blue-500" title="Renamed">R</span>;
+      case 'U': return <span className="text-gray-500" title="Untracked">U</span>;
+      default: return <span className="text-gray-400" title={`Status: ${status}`}>{status}</span>;
     }
   };
 
