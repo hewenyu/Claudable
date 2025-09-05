@@ -10,6 +10,7 @@ import { VscJson } from 'react-icons/vsc';
 import ChatLog from '../../../components/ChatLog';
 import { ProjectSettings } from '../../../components/settings/ProjectSettings';
 import ChatInput from '../../../components/chat/ChatInput';
+import GitSourceControl from '../../../components/GitSourceControl';
 import { useUserRequests } from '../../../hooks/useUserRequests';
 import { useGlobalSettings } from '@/contexts/GlobalSettingsContext';
 
@@ -198,6 +199,7 @@ export default function ChatPage({ params }: Params) {
   const [initialPromptSent, setInitialPromptSent] = useState(false);
   const initialPromptSentRef = useRef(false);
   const [showPublishPanel, setShowPublishPanel] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState<'explorer' | 'source-control'>('explorer');
   const [publishLoading, setPublishLoading] = useState(false);
   const [githubConnected, setGithubConnected] = useState<boolean | null>(null);
   const [vercelConnected, setVercelConnected] = useState<boolean | null>(null);
@@ -2289,26 +2291,69 @@ export default function ChatPage({ params }: Params) {
                 exit={{ opacity: 0 }}
                 className="h-full flex bg-white dark:bg-gray-950"
               >
-                {/* Left Sidebar - File Explorer (VS Code style) */}
+                {/* Left Sidebar - Tabbed Interface (VS Code style) */}
                 <div className="w-64 flex-shrink-0 bg-gray-50 dark:bg-[#0a0a0a] border-r border-gray-200 dark:border-[#1a1a1a] flex flex-col">
-                  {/* File Tree */}
-                  <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-[#0a0a0a] custom-scrollbar">
-                    {!tree || tree.length === 0 ? (
-                      <div className="px-3 py-8 text-center text-[11px] text-gray-600 dark:text-[#6a6a6a] select-none">
-                        No files found
+                  {/* Tab Bar */}
+                  <div className="flex border-b border-gray-200 dark:border-[#1a1a1a] bg-gray-100 dark:bg-[#0f0f0f]">
+                    <button
+                      onClick={() => setSidebarTab('explorer')}
+                      className={`flex-1 px-3 py-2 text-[11px] font-medium transition-colors ${
+                        sidebarTab === 'explorer'
+                          ? 'bg-gray-50 dark:bg-[#0a0a0a] text-gray-900 dark:text-white border-b-2 border-b-blue-500 dark:border-b-[#007acc]'
+                          : 'text-gray-600 dark:text-[#6a6a6a] hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-[#1a1a1a]'
+                      }`}
+                      title="Explorer"
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        <FaFolder className="w-3 h-3" />
+                        <span className="hidden sm:inline">Explorer</span>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => setSidebarTab('source-control')}
+                      className={`flex-1 px-3 py-2 text-[11px] font-medium transition-colors ${
+                        sidebarTab === 'source-control'
+                          ? 'bg-gray-50 dark:bg-[#0a0a0a] text-gray-900 dark:text-white border-b-2 border-b-blue-500 dark:border-b-[#007acc]'
+                          : 'text-gray-600 dark:text-[#6a6a6a] hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-[#1a1a1a]'
+                      }`}
+                      title="Source Control"
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        <FaGitAlt className="w-3 h-3" />
+                        <span className="hidden sm:inline">Git</span>
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* Tab Content */}
+                  <div className="flex-1 overflow-hidden">
+                    {sidebarTab === 'explorer' ? (
+                      /* File Explorer */
+                      <div className="h-full overflow-y-auto bg-gray-50 dark:bg-[#0a0a0a] custom-scrollbar">
+                        {!tree || tree.length === 0 ? (
+                          <div className="px-3 py-8 text-center text-[11px] text-gray-600 dark:text-[#6a6a6a] select-none">
+                            No files found
+                          </div>
+                        ) : (
+                          <TreeView 
+                            entries={tree || []}
+                            selectedFile={selectedFile}
+                            expandedFolders={expandedFolders}
+                            folderContents={folderContents}
+                            onToggleFolder={toggleFolder}
+                            onSelectFile={openFile}
+                            onLoadFolder={handleLoadFolder}
+                            level={0}
+                            parentPath=""
+                            getFileIcon={getFileIcon}
+                          />
+                        )}
                       </div>
                     ) : (
-                      <TreeView 
-                        entries={tree || []}
-                        selectedFile={selectedFile}
-                        expandedFolders={expandedFolders}
-                        folderContents={folderContents}
-                        onToggleFolder={toggleFolder}
-                        onSelectFile={openFile}
-                        onLoadFolder={handleLoadFolder}
-                        level={0}
-                        parentPath=""
-                        getFileIcon={getFileIcon}
+                      /* Git Source Control */
+                      <GitSourceControl 
+                        projectId={projectId}
+                        isVisible={sidebarTab === 'source-control'}
                       />
                     )}
                   </div>
