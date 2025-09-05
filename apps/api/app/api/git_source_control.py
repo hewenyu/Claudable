@@ -178,9 +178,15 @@ async def get_project_git_status(project_id: str, db: Session = Depends(get_db))
     if not row:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    repo_path = os.path.join(settings.projects_root, project_id, "repo")
-    if not os.path.exists(repo_path):
-        raise HTTPException(status_code=404, detail="Repository not found")
+    # Use the actual repo_path from the database
+    repo_path = row.repo_path
+    if not repo_path or not os.path.exists(repo_path):
+        # Fallback to old structure for backward compatibility
+        fallback_path = os.path.join(settings.projects_root, project_id, "repo")
+        if os.path.exists(fallback_path):
+            repo_path = fallback_path
+        else:
+            raise HTTPException(status_code=404, detail="Repository not found")
     
     return get_git_status(repo_path)
 
@@ -192,9 +198,15 @@ async def get_project_git_history(project_id: str, limit: int = 50, db: Session 
     if not row:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    repo_path = os.path.join(settings.projects_root, project_id, "repo")
-    if not os.path.exists(repo_path):
-        raise HTTPException(status_code=404, detail="Repository not found")
+    # Use the actual repo_path from the database
+    repo_path = row.repo_path
+    if not repo_path or not os.path.exists(repo_path):
+        # Fallback to old structure for backward compatibility
+        fallback_path = os.path.join(settings.projects_root, project_id, "repo")
+        if os.path.exists(fallback_path):
+            repo_path = fallback_path
+        else:
+            raise HTTPException(status_code=404, detail="Repository not found")
     
     try:
         commits = list_commits(repo_path, limit)
@@ -210,9 +222,15 @@ async def stage_files(project_id: str, request: GitStageRequest, db: Session = D
     if not row:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    repo_path = os.path.join(settings.projects_root, project_id, "repo")
-    if not os.path.exists(repo_path):
-        raise HTTPException(status_code=404, detail="Repository not found")
+    # Use the actual repo_path from the database
+    repo_path = row.repo_path
+    if not repo_path or not os.path.exists(repo_path):
+        # Fallback to old structure for backward compatibility
+        fallback_path = os.path.join(settings.projects_root, project_id, "repo")
+        if os.path.exists(fallback_path):
+            repo_path = fallback_path
+        else:
+            raise HTTPException(status_code=404, detail="Repository not found")
     
     try:
         if request.unstage:
@@ -240,9 +258,15 @@ async def commit_changes(project_id: str, request: GitCommitRequest, db: Session
     if not row:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    repo_path = os.path.join(settings.projects_root, project_id, "repo")
-    if not os.path.exists(repo_path):
-        raise HTTPException(status_code=404, detail="Repository not found")
+    # Use the actual repo_path from the database
+    repo_path = row.repo_path
+    if not repo_path or not os.path.exists(repo_path):
+        # Fallback to old structure for backward compatibility
+        fallback_path = os.path.join(settings.projects_root, project_id, "repo")
+        if os.path.exists(fallback_path):
+            repo_path = fallback_path
+        else:
+            raise HTTPException(status_code=404, detail="Repository not found")
     
     try:
         if request.files:
@@ -273,9 +297,15 @@ async def push_to_remote_endpoint(project_id: str, db: Session = Depends(get_db)
     if not row:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    repo_path = os.path.join(settings.projects_root, project_id, "repo")
-    if not os.path.exists(repo_path):
-        raise HTTPException(status_code=404, detail="Repository not found")
+    # Use the actual repo_path from the database
+    repo_path = row.repo_path
+    if not repo_path or not os.path.exists(repo_path):
+        # Fallback to old structure for backward compatibility
+        fallback_path = os.path.join(settings.projects_root, project_id, "repo")
+        if os.path.exists(fallback_path):
+            repo_path = fallback_path
+        else:
+            raise HTTPException(status_code=404, detail="Repository not found")
     
     # Get current branch
     current_branch = get_current_branch(repo_path)
@@ -302,9 +332,15 @@ async def get_file_diff(project_id: str, file_path: str, staged: bool = False, d
     if not row:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    repo_path = os.path.join(settings.projects_root, project_id, "repo")
-    if not os.path.exists(repo_path):
-        raise HTTPException(status_code=404, detail="Repository not found")
+    # Use the actual repo_path from the database
+    repo_path = row.repo_path
+    if not repo_path or not os.path.exists(repo_path):
+        # Fallback to old structure for backward compatibility
+        fallback_path = os.path.join(settings.projects_root, project_id, "repo")
+        if os.path.exists(fallback_path):
+            repo_path = fallback_path
+        else:
+            raise HTTPException(status_code=404, detail="Repository not found")
     
     try:
         if staged:
@@ -329,9 +365,15 @@ async def discard_changes(project_id: str, request: GitStageRequest, db: Session
     if not row:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    repo_path = os.path.join(settings.projects_root, project_id, "repo")
-    if not os.path.exists(repo_path):
-        raise HTTPException(status_code=404, detail="Repository not found")
+    # Use the actual repo_path from the database
+    repo_path = row.repo_path
+    if not repo_path or not os.path.exists(repo_path):
+        # Fallback to old structure for backward compatibility
+        fallback_path = os.path.join(settings.projects_root, project_id, "repo")
+        if os.path.exists(fallback_path):
+            repo_path = fallback_path
+        else:
+            raise HTTPException(status_code=404, detail="Repository not found")
     
     try:
         for file_path in request.files:
