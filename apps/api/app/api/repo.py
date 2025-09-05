@@ -40,14 +40,18 @@ async def repo_tree(
     if row.status == "initializing":
         raise HTTPException(status_code=400, detail="Project is still initializing")
 
-    repo_root = os.path.join(settings.projects_root, project_id, "repo")
-
-    # Check if repo directory exists
-    if not os.path.exists(repo_root):
-        if row.status == "failed":
-            raise HTTPException(status_code=400, detail="Project initialization failed")
+    # Use the actual repo_path from the database
+    repo_root = row.repo_path
+    if not repo_root or not os.path.exists(repo_root):
+        # Fallback to old structure for backward compatibility
+        fallback_path = os.path.join(settings.projects_root, project_id, "repo")
+        if os.path.exists(fallback_path):
+            repo_root = fallback_path
         else:
-            raise HTTPException(status_code=400, detail="Project repository not found")
+            if row.status == "failed":
+                raise HTTPException(status_code=400, detail="Project initialization failed")
+            else:
+                raise HTTPException(status_code=400, detail="Project repository not found")
 
     target = _safe_join(repo_root, dir)
     if not os.path.isdir(target):
@@ -70,7 +74,11 @@ async def repo_file(project_id: str, path: str, db: Session = Depends(get_db)):
     row = db.get(ProjectModel, project_id)
     if not row:
         raise HTTPException(status_code=404, detail="Project not found")
-    repo_root = os.path.join(settings.projects_root, project_id, "repo")
+    # Use the actual repo_path from the database
+    repo_root = row.repo_path
+    if not repo_root or not os.path.exists(repo_root):
+        # Fallback to old structure for backward compatibility
+        repo_root = os.path.join(settings.projects_root, project_id, "repo")
     target = _safe_join(repo_root, path)
     if not os.path.isfile(target):
         raise HTTPException(status_code=404, detail="File not found")

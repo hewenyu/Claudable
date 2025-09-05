@@ -101,7 +101,7 @@ def get_git_status(repo_path: str) -> GitStatusResponse:
         # First two characters indicate index and working tree status
         index_status = line[0] if len(line) > 0 else ' '
         worktree_status = line[1] if len(line) > 1 else ' '
-        file_path = line[3:] if len(line) > 3 else ''
+        file_path = line[2:].strip() if len(line) > 2 else ''
         
         # Handle rename cases (contains " -> ")
         if " -> " in file_path:
