@@ -32,9 +32,10 @@ interface CommitHistoryItem {
 interface GitSourceControlProps {
   projectId: string;
   isVisible: boolean;
+  onViewDiff?: (filePath: string, staged: boolean) => void;
 }
 
-const GitSourceControl: React.FC<GitSourceControlProps> = ({ projectId, isVisible }) => {
+const GitSourceControl: React.FC<GitSourceControlProps> = ({ projectId, isVisible, onViewDiff }) => {
   const [gitStatus, setGitStatus] = useState<GitStatusResponse | null>(null);
   const [commitHistory, setCommitHistory] = useState<CommitHistoryItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -187,6 +188,13 @@ const GitSourceControl: React.FC<GitSourceControlProps> = ({ projectId, isVisibl
       ...prev,
       [section]: !prev[section]
     }));
+  };
+
+  // Handle file click to view diff
+  const handleFileClick = (filePath: string, staged: boolean) => {
+    if (onViewDiff) {
+      onViewDiff(filePath, staged);
+    }
   };
 
   // Format date
@@ -353,7 +361,12 @@ const GitSourceControl: React.FC<GitSourceControlProps> = ({ projectId, isVisibl
                             />
                             {getFileStatusIcon(file.status)}
                             <FaFile className="w-3 h-3 text-gray-500" />
-                            <span className="text-sm flex-1 truncate">{file.path}</span>
+                            <span className="text-sm flex-1 truncate cursor-pointer hover:text-blue-600 dark:hover:text-blue-400" 
+                                  onClick={() => handleFileClick(file.path, true)}
+                                  title="Click to view diff"
+                            >
+                              {file.path}
+                            </span>
                             <button
                               onClick={() => handleStageFiles([file.path], true)}
                               className="opacity-0 group-hover:opacity-100 p-1 text-gray-600 dark:text-gray-400 hover:text-red-500 transition-colors"
@@ -393,7 +406,12 @@ const GitSourceControl: React.FC<GitSourceControlProps> = ({ projectId, isVisibl
                             />
                             {getFileStatusIcon(file.status)}
                             <FaFile className="w-3 h-3 text-gray-500" />
-                            <span className="text-sm flex-1 truncate">{file.path}</span>
+                            <span className="text-sm flex-1 truncate cursor-pointer hover:text-blue-600 dark:hover:text-blue-400" 
+                                  onClick={() => handleFileClick(file.path, false)}
+                                  title="Click to view diff"
+                            >
+                              {file.path}
+                            </span>
                             <div className="opacity-0 group-hover:opacity-100 flex gap-1">
                               <button
                                 onClick={() => handleStageFiles([file.path])}
@@ -442,7 +460,12 @@ const GitSourceControl: React.FC<GitSourceControlProps> = ({ projectId, isVisibl
                             />
                             {getFileStatusIcon(file.status)}
                             <FaFile className="w-3 h-3 text-gray-500" />
-                            <span className="text-sm flex-1 truncate">{file.path}</span>
+                            <span className="text-sm flex-1 truncate cursor-pointer hover:text-blue-600 dark:hover:text-blue-400" 
+                                  onClick={() => handleFileClick(file.path, false)}
+                                  title="Click to view diff"
+                            >
+                              {file.path}
+                            </span>
                             <div className="opacity-0 group-hover:opacity-100 flex gap-1">
                               <button
                                 onClick={() => handleStageFiles([file.path])}

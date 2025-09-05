@@ -218,6 +218,9 @@ export default function ChatPage({ params }: Params) {
   const [currentRoute, setCurrentRoute] = useState<string>('/');
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isFileUpdating, setIsFileUpdating] = useState(false);
+  const [diffContent, setDiffContent] = useState<string | null>(null);
+  const [isDiffView, setIsDiffView] = useState(false);
+  const [diffFilePath, setDiffFilePath] = useState<string | null>(null);
 
   // Guarded trigger that can be called from multiple places safely
   const triggerInitialPromptIfNeeded = useCallback(() => {
@@ -625,16 +628,65 @@ export default function ChatPage({ params }: Params) {
         console.error('Failed to load file:', r.status, r.statusText);
         setContent('// Failed to load file content');
         setSelectedFile(path);
+        // Reset diff view on error
+        setIsDiffView(false);
+        setDiffContent(null);
+        setDiffFilePath(null);
         return;
       }
       
       const data = await r.json();
       setContent(data.content || '');
       setSelectedFile(path);
+      // Reset diff view when opening regular files
+      setIsDiffView(false);
+      setDiffContent(null);
+      setDiffFilePath(null);
     } catch (error) {
       console.error('Error opening file:', error);
       setContent('// Error loading file');
       setSelectedFile(path);
+      // Reset diff view on error
+      setIsDiffView(false);
+      setDiffContent(null);
+      setDiffFilePath(null);
+    }
+  }
+
+  // Handle viewing diffs from Git source control
+  async function handleViewDiff(filePath: string, staged: boolean) {
+    try {
+      const response = await fetch(`${API_BASE}/api/projects/${projectId}/git/diff/${encodeURIComponent(filePath)}?staged=${staged}`);
+      
+      if (!response.ok) {
+        console.error('Failed to load diff:', response.status, response.statusText);
+        setContent('// Failed to load diff content');
+        setIsDiffView(true);
+        setDiffContent(null);
+        setDiffFilePath(filePath);
+        setSelectedFile(filePath);
+        return;
+      }
+      
+      const data = await response.json();
+      setDiffContent(data.diff || 'No changes to display');
+      setIsDiffView(true);
+      setDiffFilePath(filePath);
+      setSelectedFile(filePath);
+      
+      // Also set content for the editor to display
+      if (data.diff) {
+        setContent(data.diff);
+      } else {
+        setContent('No changes to display');
+      }
+    } catch (error) {
+      console.error('Error loading diff:', error);
+      setContent('// Error loading diff');
+      setIsDiffView(true);
+      setDiffContent(null);
+      setDiffFilePath(filePath);
+      setSelectedFile(filePath);
     }
   }
 
@@ -2354,6 +2406,7 @@ export default function ChatPage({ params }: Params) {
                       <GitSourceControl 
                         projectId={projectId}
                         isVisible={sidebarTab === 'source-control'}
+                        onViewDiff={handleViewDiff}
                       />
                     )}
                   </div>
@@ -2372,6 +2425,11 @@ export default function ChatPage({ params }: Params) {
                             </span>
                             <span className="text-[13px] text-gray-700 dark:text-[#cccccc]" style={{ fontFamily: "'Segoe UI', Tahoma, sans-serif" }}>
                               {selectedFile.split('/').pop()}
+                              {isDiffView && (
+                                <span className="text-[11px] text-blue-600 dark:text-blue-400 ml-2 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 rounded">
+                                  DIFF
+                                </span>
+                              )}
                             </span>
                             {isFileUpdating && (
                               <span className="text-[11px] text-green-600 dark:text-green-400 ml-auto mr-2">
@@ -2383,6 +2441,9 @@ export default function ChatPage({ params }: Params) {
                               onClick={() => {
                                 setSelectedFile('');
                                 setContent('');
+                                setIsDiffView(false);
+                                setDiffContent(null);
+                                setDiffFilePath(null);
                               }}
                             >
                               ×
@@ -2408,9 +2469,9 @@ export default function ChatPage({ params }: Params) {
                           <div className="flex-1 overflow-auto custom-scrollbar">
                             <pre className="p-4 text-[13px] leading-[19px] font-mono text-gray-800 dark:text-[#d4d4d4] whitespace-pre" style={{ fontFamily: "'Fira Code', 'Consolas', 'Monaco', monospace" }}>
                               <code 
-                                className={`language-${getFileLanguage(selectedFile)}`}
+                                className={`language-${isDiffView ? 'diff' : getFileLanguage(selectedFile)}`}
                                 dangerouslySetInnerHTML={{
-                                  __html: hljs && content ? hljs.highlight(content, { language: getFileLanguage(selectedFile) }).value : (content || '')
+                                  __html: hljs && content ? hljs.highlight(content, { language: isDiffView ? 'diff' : getFileLanguage(selectedFile) }).value : (content || '')
                                 }}
                               />
                             </pre>
