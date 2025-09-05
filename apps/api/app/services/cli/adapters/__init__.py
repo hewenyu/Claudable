@@ -1,8 +1,8 @@
 from .claude_code import ClaudeCodeCLI
-from .cursor_agent import CursorAgentCLI
 from .codex_cli import CodexCLI
-from .qwen_cli import QwenCLI
+from .cursor_agent import CursorAgentCLI
 from .gemini_cli import GeminiCLI
+from .qwen_cli import QwenCLI
 
 __all__ = [
     "ClaudeCodeCLI",

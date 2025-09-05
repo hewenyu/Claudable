@@ -2,6 +2,7 @@
 
 Moved from unified_manager.py to a dedicated adapter module.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -11,8 +12,8 @@ import uuid
 from datetime import datetime
 from typing import Any, AsyncGenerator, Callable, Dict, List, Optional
 
-from app.models.messages import Message
 from app.core.terminal_ui import ui
+from app.models.messages import Message
 
 from ..base import BaseCLI, CLIType
 
@@ -312,7 +313,9 @@ class CursorAgentCLI(BaseCLI):
 
         project_repo_path = os.path.join(project_path, "repo")
         if not os.path.exists(project_repo_path):
-            project_repo_path = project_path  # Fallback to project_path if repo subdir doesn't exist
+            project_repo_path = (
+                project_path  # Fallback to project_path if repo subdir doesn't exist
+            )
 
         try:
             process = await asyncio.create_subprocess_exec(
@@ -374,7 +377,10 @@ class CursorAgentCLI(BaseCLI):
                                 or event["message"].get("chat_id")
                             )
 
-                        if potential_session_id and potential_session_id != active_session_id:
+                        if (
+                            potential_session_id
+                            and potential_session_id != active_session_id
+                        ):
                             cursor_session_id = potential_session_id
                             await self.set_session_id(project_id, cursor_session_id)
                             print(
@@ -406,7 +412,10 @@ class CursorAgentCLI(BaseCLI):
                     )
 
                     if message:
-                        if message.role == "assistant" and message.message_type == "chat":
+                        if (
+                            message.role == "assistant"
+                            and message.message_type == "chat"
+                        ):
                             assistant_message_buffer += message.content
                         else:
                             if log_callback:
@@ -470,9 +479,7 @@ class CursorAgentCLI(BaseCLI):
                 print(f"✅ [Cursor] Session completed: {cursor_session_id}")
 
         except FileNotFoundError:
-            error_msg = (
-                "❌ Cursor Agent CLI not found. Please install with: curl https://cursor.com/install -fsS | bash"
-            )
+            error_msg = "❌ Cursor Agent CLI not found. Please install with: curl https://cursor.com/install -fsS | bash"
             yield Message(
                 id=str(uuid.uuid4()),
                 project_id=project_path,

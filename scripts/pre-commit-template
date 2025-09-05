@@ -1,0 +1,16 @@
+#!/bin/sh
+# Pre-commit hook template
+# To install: cp scripts/pre-commit-template .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+echo "Running pre-commit linting checks..."
+
+# Run Python linting
+cd apps/api
+echo "Checking Python code..."
+python -m flake8 app || exit 1
+python -m black --check app || exit 1
+python -m isort --check-only app || exit 1
+
+cd ../../
+
+echo "Pre-commit checks passed!"

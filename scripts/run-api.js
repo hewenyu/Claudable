@@ -13,9 +13,8 @@ const isWindows = os.platform() === 'win32';
 const apiPort = process.env.API_PORT || 8080;
 
 // Determine Python path in venv
-const pythonPath = isWindows 
-  ? path.join(apiDir, '.venv', 'Scripts', 'python.exe')
-  : path.join(apiDir, '.venv', 'bin', 'python');
+// Use the python from the current shell environment
+const pythonPath = 'python';
 
 // Start the API server
 console.log(`Starting API server on http://localhost:${apiPort}...`);

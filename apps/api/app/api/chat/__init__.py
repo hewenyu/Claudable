@@ -2,13 +2,13 @@
 Chat API Router
 Combines all chat-related endpoints
 """
+
 from fastapi import APIRouter
 
-from .websocket import router as websocket_router
-from .messages import router as messages_router
 from .act import router as act_router
 from .cli_preferences import router as cli_router
-
+from .messages import router as messages_router
+from .websocket import router as websocket_router
 
 # Create main chat router (prefix will be added in main.py)
 router = APIRouter()

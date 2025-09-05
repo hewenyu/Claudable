@@ -4,15 +4,16 @@ This adapter launches `qwen --experimental-acp`, speaks JSON-RPC over stdio,
 and streams session/update notifications into our Message model. Thought
 chunks are surfaced to the UI (unlike some providers that hide them).
 """
+
 from __future__ import annotations
 
 import asyncio
 import base64
 import json
 import os
+import shutil
 import uuid
 from dataclasses import dataclass
-import shutil
 from datetime import datetime
 from typing import Any, AsyncGenerator, Awaitable, Callable, Dict, List, Optional
 
@@ -30,7 +31,12 @@ class _Pending:
 class _ACPClient:
     """Minimal JSON-RPC client over newline-delimited JSON on stdio."""
 
-    def __init__(self, cmd: List[str], env: Optional[Dict[str, str]] = None, cwd: Optional[str] = None):
+    def __init__(
+        self,
+        cmd: List[str],
+        env: Optional[Dict[str, str]] = None,
+        cwd: Optional[str] = None,
+    ):
         self._cmd = cmd
         self._env = env or os.environ.copy()
         self._cwd = cwd or os.getcwd()
@@ -38,7 +44,9 @@ class _ACPClient:
         self._next_id = 1
         self._pending: Dict[int, _Pending] = {}
         self._notif_handlers: Dict[str, List[Callable[[Dict[str, Any]], None]]] = {}
-        self._request_handlers: Dict[str, Callable[[Dict[str, Any]], Awaitable[Dict[str, Any]]]] = {}
+        self._request_handlers: Dict[
+            str, Callable[[Dict[str, Any]], Awaitable[Dict[str, Any]]]
+        ] = {}
         self._reader_task: Optional[asyncio.Task] = None
 
     async def start(self) -> None:
@@ -70,13 +78,21 @@ class _ACPClient:
                 self._reader_task.cancel()
                 self._reader_task = None
 
-    def on_notification(self, method: str, handler: Callable[[Dict[str, Any]], None]) -> None:
+    def on_notification(
+        self, method: str, handler: Callable[[Dict[str, Any]], None]
+    ) -> None:
         self._notif_handlers.setdefault(method, []).append(handler)
 
-    def on_request(self, method: str, handler: Callable[[Dict[str, Any]], Awaitable[Dict[str, Any]]]) -> None:
+    def on_request(
+        self,
+        method: str,
+        handler: Callable[[Dict[str, Any]], Awaitable[Dict[str, Any]]],
+    ) -> None:
         self._request_handlers[method] = handler
 
-    async def request(self, method: str, params: Optional[Dict[str, Any]] = None) -> Any:
+    async def request(
+        self, method: str, params: Optional[Dict[str, Any]] = None
+    ) -> Any:
         if not self._proc or not self._proc.stdin:
             raise RuntimeError("ACP process not started")
         msg_id = self._next_id
@@ -108,7 +124,11 @@ class _ACPClient:
 
             # Response
             if isinstance(msg, dict) and "id" in msg and "method" not in msg:
-                slot = self._pending.pop(int(msg["id"])) if int(msg["id"]) in self._pending else None
+                slot = (
+                    self._pending.pop(int(msg["id"]))
+                    if int(msg["id"]) in self._pending
+                    else None
+                )
                 if not slot:
                     continue
                 if "error" in msg:
@@ -126,19 +146,25 @@ class _ACPClient:
                 if handler:
                     try:
                         result = await handler(params)
-                        await self._send({"jsonrpc": "2.0", "id": req_id, "result": result})
+                        await self._send(
+                            {"jsonrpc": "2.0", "id": req_id, "result": result}
+                        )
                     except Exception as e:
-                        await self._send({
+                        await self._send(
+                            {
+                                "jsonrpc": "2.0",
+                                "id": req_id,
+                                "error": {"code": -32000, "message": str(e)},
+                            }
+                        )
+                else:
+                    await self._send(
+                        {
                             "jsonrpc": "2.0",
                             "id": req_id,
-                            "error": {"code": -32000, "message": str(e)},
-                        })
-                else:
-                    await self._send({
-                        "jsonrpc": "2.0",
-                        "id": req_id,
-                        "error": {"code": -32601, "message": "Method not found"},
-                    })
+                            "error": {"code": -32601, "message": "Method not found"},
+                        }
+                    )
                 continue
 
             # Notification from agent
@@ -262,7 +288,10 @@ class QwenCLI(BaseCLI):
                 if not chosen:
                     return {"outcome": {"outcome": "cancelled"}}
                 return {
-                    "outcome": {"outcome": "selected", "optionId": chosen.get("optionId")}
+                    "outcome": {
+                        "outcome": "selected",
+                        "optionId": chosen.get("optionId"),
+                    }
                 }
 
             async def _fs_read(params: Dict[str, Any]) -> Dict[str, Any]:
@@ -275,7 +304,7 @@ class QwenCLI(BaseCLI):
                     # If old_string is missing but content exists, log warning
                     ui.warning(
                         f"Qwen edit missing 'old_string' parameter: {params.get('path', 'unknown')}",
-                        "Qwen"
+                        "Qwen",
                     )
                     return {"error": "Missing required parameter: old_string"}
                 # Not fully implemented for safety, but return success to avoid blocking
@@ -283,25 +312,27 @@ class QwenCLI(BaseCLI):
 
             async def _edit_file(params: Dict[str, Any]) -> Dict[str, Any]:
                 # Handle edit requests with proper parameter validation
-                path = params.get('path', params.get('file_path', 'unknown'))
-                
+                path = params.get("path", params.get("file_path", "unknown"))
+
                 # Log the edit attempt for debugging
-                ui.debug(f"Qwen edit request: path={path}, has_old_string={'old_string' in params}", "Qwen")
-                
+                ui.debug(
+                    f"Qwen edit request: path={path}, has_old_string={'old_string' in params}",
+                    "Qwen",
+                )
+
                 if "old_string" not in params:
-                    ui.warning(
-                        f"Qwen edit missing 'old_string': {path}",
-                        "Qwen"
-                    )
+                    ui.warning(f"Qwen edit missing 'old_string': {path}", "Qwen")
                     # Return success anyway to not block Qwen's workflow
                     # This allows Qwen to continue even with malformed requests
                     return {"success": True}
-                
+
                 # For safety, we don't actually perform the edit but return success
                 ui.debug(f"Qwen edit would modify: {path}", "Qwen")
                 return {"success": True}
 
-            QwenCLI._SHARED_CLIENT.on_request("session/request_permission", _handle_permission)
+            QwenCLI._SHARED_CLIENT.on_request(
+                "session/request_permission", _handle_permission
+            )
             QwenCLI._SHARED_CLIENT.on_request("fs/read_text_file", _fs_read)
             QwenCLI._SHARED_CLIENT.on_request("fs/write_text_file", _fs_write)
             QwenCLI._SHARED_CLIENT.on_request("edit", _edit_file)
@@ -312,6 +343,7 @@ class QwenCLI(BaseCLI):
             try:
                 proc = QwenCLI._SHARED_CLIENT._proc
                 if proc and proc.stderr:
+
                     async def _log_stderr(stream):
                         while True:
                             line = await stream.readline()
@@ -325,11 +357,16 @@ class QwenCLI(BaseCLI):
                             if "[ERROR] [ImportProcessor]" in decoded:
                                 continue
                             # Skip ENOENT errors for node_modules paths
-                            if "ENOENT" in decoded and ("node_modules" in decoded or "tailwind" in decoded or "supabase" in decoded):
+                            if "ENOENT" in decoded and (
+                                "node_modules" in decoded
+                                or "tailwind" in decoded
+                                or "supabase" in decoded
+                            ):
                                 continue
                             # Only log meaningful errors
                             if decoded and not decoded.startswith("DEBUG"):
                                 ui.warning(decoded, "Qwen STDERR")
+
                     asyncio.create_task(_log_stderr(proc.stderr))
             except Exception:
                 pass
@@ -417,7 +454,8 @@ class QwenCLI(BaseCLI):
                     if stored_session_id:
                         await self.set_session_id(project_id, stored_session_id)
                         ui.info(
-                            f"Qwen session created after auth: {stored_session_id}", "Qwen"
+                            f"Qwen session created after auth: {stored_session_id}",
+                            "Qwen",
                         )
                 except Exception as e2:
                     err = f"Qwen authentication/session failed: {e2}"
@@ -489,7 +527,9 @@ class QwenCLI(BaseCLI):
                 # Flush remaining updates quickly
                 while not q.empty():
                     update = q.get_nowait()
-                    async for m in self._update_to_messages(update, project_path, session_id, thought_buffer, text_buffer):
+                    async for m in self._update_to_messages(
+                        update, project_path, session_id, thought_buffer, text_buffer
+                    ):
                         if m:
                             yield m
                 # Handle prompt exception (e.g., session not found) with one retry
@@ -497,10 +537,14 @@ class QwenCLI(BaseCLI):
                 if exc:
                     msg = str(exc)
                     if "Session not found" in msg or "session not found" in msg.lower():
-                        ui.warning("Qwen session expired; creating a new session and retrying", "Qwen")
+                        ui.warning(
+                            "Qwen session expired; creating a new session and retrying",
+                            "Qwen",
+                        )
                         try:
                             result = await client.request(
-                                "session/new", {"cwd": project_repo_path, "mcpServers": []}
+                                "session/new",
+                                {"cwd": project_repo_path, "mcpServers": []},
                             )
                             stored_session_id = result.get("sessionId")
                             if stored_session_id:
@@ -550,7 +594,9 @@ class QwenCLI(BaseCLI):
                 if task is not prompt_task:
                     update = task.result()
                     # Suppress verbose per-chunk logs; log only tool calls below
-                    async for m in self._update_to_messages(update, project_path, session_id, thought_buffer, text_buffer):
+                    async for m in self._update_to_messages(
+                        update, project_path, session_id, thought_buffer, text_buffer
+                    ):
                         if m:
                             yield m
 
@@ -578,7 +624,9 @@ class QwenCLI(BaseCLI):
         kind = update.get("sessionUpdate") or update.get("type")
         now = datetime.utcnow()
         if kind in ("agent_message_chunk", "agent_thought_chunk"):
-            text = ((update.get("content") or {}).get("text")) or update.get("text") or ""
+            text = (
+                ((update.get("content") or {}).get("text")) or update.get("text") or ""
+            )
             if not isinstance(text, str):
                 text = str(text)
             if kind == "agent_thought_chunk":
@@ -688,9 +736,12 @@ class QwenCLI(BaseCLI):
             # Unknown update kinds ignored
             return
 
-    def _compose_content(self, thought_buffer: List[str], text_buffer: List[str]) -> str:
+    def _compose_content(
+        self, thought_buffer: List[str], text_buffer: List[str]
+    ) -> str:
         # Qwen formatting per result_qwen.md: merge thoughts + text, and filter noisy call_* lines
         import re
+
         parts: List[str] = []
         if thought_buffer:
             parts.append("".join(thought_buffer))
@@ -734,7 +785,7 @@ class QwenCLI(BaseCLI):
                     or first.get("uri")
                 )
                 if isinstance(path, str) and path.startswith("file://"):
-                    path = path[len("file://"):]
+                    path = path[len("file://") :]
         if not path:
             content = update.get("content")
             if isinstance(content, list):

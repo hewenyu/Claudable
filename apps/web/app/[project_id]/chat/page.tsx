@@ -168,6 +168,14 @@ export default function ChatPage({ params }: Params) {
   const [projectName, setProjectName] = useState<string>('');
   const [projectDescription, setProjectDescription] = useState<string>('');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  
+  // Workspace/Git branch management state
+  const [isWorkspace, setIsWorkspace] = useState<boolean>(false);
+  const [currentBranch, setCurrentBranch] = useState<string>('');
+  const [availableBranches, setAvailableBranches] = useState<string[]>([]);
+  const [switchingBranch, setSwitchingBranch] = useState<boolean>(false);
+  const [showBranchDropdown, setShowBranchDropdown] = useState<boolean>(false);
+  
   const [tree, setTree] = useState<Entry[]>([]);
   const [content, setContent] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<string>('');
@@ -199,6 +207,8 @@ export default function ChatPage({ params }: Params) {
   const deployPollRef = useRef<NodeJS.Timeout | null>(null);
   const [isStartingPreview, setIsStartingPreview] = useState(false);
   const [previewInitializationMessage, setPreviewInitializationMessage] = useState('Starting development server...');
+  const [supportsPreview, setSupportsPreview] = useState<boolean | null>(null); // null = checking, true/false = result
+  const [previewCheckReason, setPreviewCheckReason] = useState<string>('');
   const [preferredCli, setPreferredCli] = useState<string>('claude');
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [usingGlobalDefaults, setUsingGlobalDefaults] = useState<boolean>(true);
@@ -232,6 +242,33 @@ export default function ChatPage({ params }: Params) {
       sendInitialPrompt(initialPromptFromUrl);
     }, 300);
   }, [searchParams]);
+
+  // Check if project supports preview functionality
+  const checkPreviewSupport = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/projects/${projectId}/preview/check`);
+      if (response.ok) {
+        const data = await response.json();
+        setSupportsPreview(data.is_frontend);
+        setPreviewCheckReason(data.reason);
+        console.log(`Preview support check: ${data.is_frontend ? 'Supported' : 'Not supported'} - ${data.reason}`);
+        
+        // If project doesn't support preview, switch to code view
+        if (!data.is_frontend) {
+          setShowPreview(false);
+        }
+      } else {
+        // If endpoint fails, assume it might support preview (backward compatibility)
+        setSupportsPreview(true);
+        setPreviewCheckReason('Could not determine project type');
+      }
+    } catch (error) {
+      console.error('Failed to check preview support:', error);
+      // If check fails, assume it might support preview (backward compatibility)
+      setSupportsPreview(true);
+      setPreviewCheckReason('Could not check project type');
+    }
+  }, [projectId]);
 
   const loadDeployStatus = useCallback(async () => {
     try {
@@ -392,6 +429,12 @@ export default function ChatPage({ params }: Params) {
   }, [projectId]);
 
   async function start() {
+    // Check if preview is supported before attempting to start
+    if (supportsPreview === false) {
+      alert(`Preview not available: ${previewCheckReason}`);
+      return;
+    }
+    
     try {
       setIsStartingPreview(true);
       setPreviewInitializationMessage('Starting development server...');
@@ -402,8 +445,23 @@ export default function ChatPage({ params }: Params) {
       
       const r = await fetch(`${API_BASE}/api/projects/${projectId}/preview/start`, { method: 'POST' });
       if (!r.ok) {
-        console.error('Failed to start preview:', r.statusText);
+        const errorText = await r.text();
+        console.error('Failed to start preview:', errorText);
         setPreviewInitializationMessage('Failed to start preview');
+        
+        // Show user-friendly error message
+        if (errorText.includes('Preview not available')) {
+          alert(errorText);
+          // Update preview support status
+          setSupportsPreview(false);
+          const reasonMatch = errorText.match(/Preview not available: (.+?)\./);
+          if (reasonMatch) {
+            setPreviewCheckReason(reasonMatch[1]);
+          }
+        } else {
+          setPreviewInitializationMessage('Failed to start preview');
+        }
+        
         setTimeout(() => setIsStartingPreview(false), 2000);
         return;
       }
@@ -842,6 +900,13 @@ export default function ChatPage({ params }: Params) {
         });
         setProjectName(project.name || `Project ${projectId.slice(0, 8)}`);
         
+        // Check if this is a workspace (has local_git_project_name)
+        if (project.local_git_project_name) {
+          setIsWorkspace(true);
+          setCurrentBranch(project.current_branch || 'main');
+          await loadWorkspaceBranches();
+        }
+        
         // Set CLI and model from project settings if available
         if (project.preferred_cli) {
           console.log('✅ Setting CLI from project:', project.preferred_cli);
@@ -914,6 +979,53 @@ export default function ChatPage({ params }: Params) {
       setIsInitializing(false);
       setUsingGlobalDefaults(true);
       return {}; // Return empty object on error
+    }
+  }
+
+  // Workspace branch management functions
+  async function loadWorkspaceBranches() {
+    if (!isWorkspace) return;
+    
+    try {
+      const response = await fetch(`${API_BASE}/api/workspace/${projectId}/branches`);
+      if (response.ok) {
+        const branches = await response.json();
+        setAvailableBranches(branches);
+      }
+    } catch (error) {
+      console.error('Failed to load workspace branches:', error);
+    }
+  }
+
+  async function switchBranch(branchName: string) {
+    if (!isWorkspace || switchingBranch) return;
+    
+    setSwitchingBranch(true);
+    try {
+      const response = await fetch(`${API_BASE}/api/workspace/${projectId}/switch-branch?branch_name=${encodeURIComponent(branchName)}`, {
+        method: 'POST'
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        setCurrentBranch(branchName);
+        setShowBranchDropdown(false);
+        
+        // Reload file tree to reflect branch changes
+        await load();
+        
+        // Show success toast
+        console.log('✅ Branch switched successfully:', result.message);
+      } else {
+        const error = await response.json().catch(() => ({ detail: 'Failed to switch branch' }));
+        console.error('❌ Branch switch failed:', error.detail);
+        alert(`Failed to switch branch: ${error.detail}`);
+      }
+    } catch (error) {
+      console.error('❌ Branch switch error:', error);
+      alert('Failed to switch branch. Please try again.');
+    } finally {
+      setSwitchingBranch(false);
     }
   }
 
@@ -1239,6 +1351,9 @@ export default function ChatPage({ params }: Params) {
       // Load project info first to get project-specific settings
       const projectSettings = await loadProjectInfo();
       
+      // Check if project supports preview
+      await checkPreviewSupport();
+      
       // Then load global settings as fallback, passing project settings
       await loadSettings(projectSettings);
       
@@ -1307,6 +1422,23 @@ export default function ChatPage({ params }: Params) {
       else setSelectedModel('');
     }
   }, [globalSettings, usingGlobalDefaults]);
+
+  // Handle click outside for branch dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showBranchDropdown) {
+        const target = event.target as Element;
+        if (!target.closest('[data-branch-dropdown]')) {
+          setShowBranchDropdown(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showBranchDropdown]);
 
 
   // Show loading UI if project is initializing
@@ -1442,6 +1574,57 @@ export default function ChatPage({ params }: Params) {
                       {projectDescription}
                     </p>
                   )}
+                  {/* Git Branch Selector for Workspaces */}
+                  {isWorkspace && currentBranch && (
+                    <div className="mt-2 relative" data-branch-dropdown>
+                      <button
+                        onClick={() => setShowBranchDropdown(!showBranchDropdown)}
+                        disabled={switchingBranch}
+                        className="flex items-center gap-2 px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-md hover:bg-blue-200 dark:hover:bg-blue-900/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Switch branch"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M6 3v12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M18 9a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M6 21a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M15 7v4.5a3.5 3.5 0 0 1-7 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        <span>{switchingBranch ? 'Switching...' : currentBranch}</span>
+                        {!switchingBranch && (
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </button>
+                      
+                      {/* Branch Dropdown */}
+                      {showBranchDropdown && availableBranches.length > 0 && (
+                        <div className="absolute top-full left-0 mt-1 z-50 min-w-[150px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                          {availableBranches.map((branch) => (
+                            <button
+                              key={branch}
+                              onClick={() => switchBranch(branch)}
+                              disabled={switchingBranch || branch === currentBranch}
+                              className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                                branch === currentBranch 
+                                  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium' 
+                                  : 'text-gray-700 dark:text-gray-300'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                {branch === currentBranch && (
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                )}
+                                <span>{branch}</span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1497,23 +1680,29 @@ export default function ChatPage({ params }: Params) {
                 <div className="flex items-center gap-3">
                   {/* 토글 스위치 */}
                   <div className="flex items-center bg-gray-100 dark:bg-gray-900 rounded-lg p-1">
+                    {/* Only show preview button if project supports it */}
+                    {supportsPreview !== false && (
+                      <button
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                          showPreview 
+                            ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white' 
+                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                        }`}
+                        onClick={() => setShowPreview(true)}
+                        title={supportsPreview === null ? 'Checking preview support...' : 'Show preview'}
+                        disabled={supportsPreview === null}
+                      >
+                        <span className="w-4 h-4 flex items-center justify-center"><FaDesktop size={16} /></span>
+                      </button>
+                    )}
                     <button
                       className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                        showPreview 
-                          ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white' 
-                          : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                      }`}
-                      onClick={() => setShowPreview(true)}
-                    >
-                      <span className="w-4 h-4 flex items-center justify-center"><FaDesktop size={16} /></span>
-                    </button>
-                    <button
-                      className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                        !showPreview 
+                        !showPreview || supportsPreview === false
                           ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white' 
                           : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                       }`}
                       onClick={() => setShowPreview(false)}
+                      title="Show code"
                     >
                       <span className="w-4 h-4 flex items-center justify-center"><FaCode size={16} /></span>
                     </button>
@@ -2020,8 +2209,8 @@ export default function ChatPage({ params }: Params) {
                         ) : (
                           <>
                             <div
-                              onClick={!isRunning && !isStartingPreview ? start : undefined}
-                              className={`w-40 h-40 mx-auto mb-6 relative ${!isRunning && !isStartingPreview ? 'cursor-pointer group' : ''}`}
+                              onClick={!isRunning && !isStartingPreview && supportsPreview !== false ? start : undefined}
+                              className={`w-40 h-40 mx-auto mb-6 relative ${!isRunning && !isStartingPreview && supportsPreview !== false ? 'cursor-pointer group' : ''}`}
                             >
                               {/* Claudable Symbol with rotating animation when starting */}
                               <MotionDiv
@@ -2050,6 +2239,15 @@ export default function ChatPage({ params }: Params) {
                                       borderTopColor: 'transparent'
                                     }}
                                   />
+                                ) : supportsPreview === false ? (
+                                  // Show a "not available" icon for non-frontend projects
+                                  <MotionDiv
+                                    className="flex items-center justify-center opacity-50"
+                                  >
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z" fill="currentColor"/>
+                                    </svg>
+                                  </MotionDiv>
                                 ) : (
                                   <MotionDiv
                                     className="flex items-center justify-center"
@@ -2065,11 +2263,14 @@ export default function ChatPage({ params }: Params) {
                             </div>
                             
                             <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
-                              Preview Not Running
+                              {supportsPreview === false ? 'Preview Not Available' : 'Preview Not Running'}
                             </h3>
                             
                             <p className="text-gray-600 dark:text-gray-400 max-w-lg mx-auto">
-                              Start your development server to see live changes
+                              {supportsPreview === false 
+                                ? `${previewCheckReason}. Use the code view to explore the project.`
+                                : 'Start your development server to see live changes'
+                              }
                             </p>
                           </>
                         )}

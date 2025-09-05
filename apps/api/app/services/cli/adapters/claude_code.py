@@ -2,6 +2,7 @@
 
 Moved from unified_manager.py to a dedicated adapter module.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -10,9 +11,10 @@ import uuid
 from datetime import datetime
 from typing import Any, AsyncGenerator, Callable, Dict, List, Optional
 
+from claude_code_sdk import ClaudeCodeOptions, ClaudeSDKClient
+
 from app.core.terminal_ui import ui
 from app.models.messages import Message
-from claude_code_sdk import ClaudeSDKClient, ClaudeCodeOptions
 
 from ..base import BaseCLI, CLIType
 
@@ -108,9 +110,7 @@ class ClaudeCodeCLI(BaseCLI):
             ui.debug(f"System prompt loaded: {len(system_prompt)} chars", "Claude SDK")
         except Exception as e:
             ui.error(f"Failed to load system prompt: {e}", "Claude SDK")
-            system_prompt = (
-                "You are Claude Code, an AI coding assistant specialized in building modern web applications."
-            )
+            system_prompt = "You are Claude Code, an AI coding assistant specialized in building modern web applications."
 
         # Get CLI-specific model name
         cli_model = self._get_cli_model_name(model) or "claude-sonnet-4-20250514"
@@ -138,9 +138,7 @@ public/
 node_modules/
 </initial_context>"""
             instruction = instruction + project_structure_info
-            ui.info(
-                f"Added project structure info to initial prompt", "Claude SDK"
-            )
+            ui.info(f"Added project structure info to initial prompt", "Claude SDK")
 
         # Configure tools based on initial prompt status
         if is_initial_prompt:
@@ -213,7 +211,11 @@ node_modules/
         try:
             # Change to project directory
             original_cwd = os.getcwd()
-            os.chdir(project_path)
+            if project_path and os.path.exists(project_path):
+                os.chdir(project_path)
+            else:
+                ui.warning(f"Project path not found or None: {project_path}, using current directory", "Claude SDK")
+                project_path = original_cwd
 
             # Get project ID for session management
             project_id = (
@@ -238,18 +240,18 @@ node_modules/
                         # Import SDK types for isinstance checks
                         try:
                             from anthropic.claude_code.types import (
-                                SystemMessage,
                                 AssistantMessage,
-                                UserMessage,
                                 ResultMessage,
+                                SystemMessage,
+                                UserMessage,
                             )
                         except ImportError:
                             try:
                                 from claude_code_sdk.types import (
-                                    SystemMessage,
                                     AssistantMessage,
-                                    UserMessage,
                                     ResultMessage,
+                                    SystemMessage,
+                                    UserMessage,
                                 )
                             except ImportError:
                                 # Fallback - check type name strings
@@ -259,19 +261,16 @@ node_modules/
                                 ResultMessage = type(None)
 
                         # Handle SystemMessage for session_id extraction
-                        if (
-                            isinstance(message_obj, SystemMessage)
-                            or "SystemMessage" in str(type(message_obj))
-                        ):
+                        if isinstance(
+                            message_obj, SystemMessage
+                        ) or "SystemMessage" in str(type(message_obj)):
                             # Extract session_id if available
                             if (
                                 hasattr(message_obj, "session_id")
                                 and message_obj.session_id
                             ):
                                 claude_session_id = message_obj.session_id
-                                await self.set_session_id(
-                                    project_id, claude_session_id
-                                )
+                                await self.set_session_id(project_id, claude_session_id)
 
                             # Send init message (hidden from UI)
                             init_message = Message(
@@ -295,10 +294,9 @@ node_modules/
                             yield init_message
 
                         # Handle AssistantMessage (complete messages)
-                        elif (
-                            isinstance(message_obj, AssistantMessage)
-                            or "AssistantMessage" in str(type(message_obj))
-                        ):
+                        elif isinstance(
+                            message_obj, AssistantMessage
+                        ) or "AssistantMessage" in str(type(message_obj)):
                             content = ""
 
                             # Process content - AssistantMessage has content: list[ContentBlock]
@@ -309,8 +307,8 @@ node_modules/
                                     # Import block types for comparison
                                     from claude_code_sdk.types import (
                                         TextBlock,
-                                        ToolUseBlock,
                                         ToolResultBlock,
+                                        ToolUseBlock,
                                     )
 
                                     if isinstance(block, TextBlock):
@@ -370,10 +368,9 @@ node_modules/
                                 yield text_message
 
                         # Handle UserMessage (tool results, etc.)
-                        elif (
-                            isinstance(message_obj, UserMessage)
-                            or "UserMessage" in str(type(message_obj))
-                        ):
+                        elif isinstance(
+                            message_obj, UserMessage
+                        ) or "UserMessage" in str(type(message_obj)):
                             # UserMessage has content: str according to types.py
                             # UserMessages are typically tool results - we don't need to show them
                             pass
@@ -458,9 +455,7 @@ node_modules/
         try:
             # Store in memory as fallback
             self.session_mapping[project_id] = session_id
-            ui.debug(
-                f"Session ID stored for project {project_id}", "Claude SDK"
-            )
+            ui.debug(f"Session ID stored for project {project_id}", "Claude SDK")
         except Exception as e:
             ui.warning(f"Failed to save session ID: {e}", "Claude SDK")
             # Fallback to memory storage
