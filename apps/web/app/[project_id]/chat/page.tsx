@@ -207,6 +207,8 @@ export default function ChatPage({ params }: Params) {
   const deployPollRef = useRef<NodeJS.Timeout | null>(null);
   const [isStartingPreview, setIsStartingPreview] = useState(false);
   const [previewInitializationMessage, setPreviewInitializationMessage] = useState('Starting development server...');
+  const [supportsPreview, setSupportsPreview] = useState<boolean | null>(null); // null = checking, true/false = result
+  const [previewCheckReason, setPreviewCheckReason] = useState<string>('');
   const [preferredCli, setPreferredCli] = useState<string>('claude');
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [usingGlobalDefaults, setUsingGlobalDefaults] = useState<boolean>(true);
@@ -240,6 +242,33 @@ export default function ChatPage({ params }: Params) {
       sendInitialPrompt(initialPromptFromUrl);
     }, 300);
   }, [searchParams]);
+
+  // Check if project supports preview functionality
+  const checkPreviewSupport = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/projects/${projectId}/preview/check`);
+      if (response.ok) {
+        const data = await response.json();
+        setSupportsPreview(data.is_frontend);
+        setPreviewCheckReason(data.reason);
+        console.log(`Preview support check: ${data.is_frontend ? 'Supported' : 'Not supported'} - ${data.reason}`);
+        
+        // If project doesn't support preview, switch to code view
+        if (!data.is_frontend) {
+          setShowPreview(false);
+        }
+      } else {
+        // If endpoint fails, assume it might support preview (backward compatibility)
+        setSupportsPreview(true);
+        setPreviewCheckReason('Could not determine project type');
+      }
+    } catch (error) {
+      console.error('Failed to check preview support:', error);
+      // If check fails, assume it might support preview (backward compatibility)
+      setSupportsPreview(true);
+      setPreviewCheckReason('Could not check project type');
+    }
+  }, [projectId]);
 
   const loadDeployStatus = useCallback(async () => {
     try {
@@ -400,6 +429,12 @@ export default function ChatPage({ params }: Params) {
   }, [projectId]);
 
   async function start() {
+    // Check if preview is supported before attempting to start
+    if (supportsPreview === false) {
+      alert(`Preview not available: ${previewCheckReason}`);
+      return;
+    }
+    
     try {
       setIsStartingPreview(true);
       setPreviewInitializationMessage('Starting development server...');
@@ -410,8 +445,23 @@ export default function ChatPage({ params }: Params) {
       
       const r = await fetch(`${API_BASE}/api/projects/${projectId}/preview/start`, { method: 'POST' });
       if (!r.ok) {
-        console.error('Failed to start preview:', r.statusText);
+        const errorText = await r.text();
+        console.error('Failed to start preview:', errorText);
         setPreviewInitializationMessage('Failed to start preview');
+        
+        // Show user-friendly error message
+        if (errorText.includes('Preview not available')) {
+          alert(errorText);
+          // Update preview support status
+          setSupportsPreview(false);
+          const reasonMatch = errorText.match(/Preview not available: (.+?)\./);
+          if (reasonMatch) {
+            setPreviewCheckReason(reasonMatch[1]);
+          }
+        } else {
+          setPreviewInitializationMessage('Failed to start preview');
+        }
+        
         setTimeout(() => setIsStartingPreview(false), 2000);
         return;
       }
@@ -1301,6 +1351,9 @@ export default function ChatPage({ params }: Params) {
       // Load project info first to get project-specific settings
       const projectSettings = await loadProjectInfo();
       
+      // Check if project supports preview
+      await checkPreviewSupport();
+      
       // Then load global settings as fallback, passing project settings
       await loadSettings(projectSettings);
       
@@ -1627,23 +1680,29 @@ export default function ChatPage({ params }: Params) {
                 <div className="flex items-center gap-3">
                   {/* 토글 스위치 */}
                   <div className="flex items-center bg-gray-100 dark:bg-gray-900 rounded-lg p-1">
+                    {/* Only show preview button if project supports it */}
+                    {supportsPreview !== false && (
+                      <button
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                          showPreview 
+                            ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white' 
+                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                        }`}
+                        onClick={() => setShowPreview(true)}
+                        title={supportsPreview === null ? 'Checking preview support...' : 'Show preview'}
+                        disabled={supportsPreview === null}
+                      >
+                        <span className="w-4 h-4 flex items-center justify-center"><FaDesktop size={16} /></span>
+                      </button>
+                    )}
                     <button
                       className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                        showPreview 
-                          ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white' 
-                          : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                      }`}
-                      onClick={() => setShowPreview(true)}
-                    >
-                      <span className="w-4 h-4 flex items-center justify-center"><FaDesktop size={16} /></span>
-                    </button>
-                    <button
-                      className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                        !showPreview 
+                        !showPreview || supportsPreview === false
                           ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white' 
                           : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                       }`}
                       onClick={() => setShowPreview(false)}
+                      title="Show code"
                     >
                       <span className="w-4 h-4 flex items-center justify-center"><FaCode size={16} /></span>
                     </button>
@@ -2150,8 +2209,8 @@ export default function ChatPage({ params }: Params) {
                         ) : (
                           <>
                             <div
-                              onClick={!isRunning && !isStartingPreview ? start : undefined}
-                              className={`w-40 h-40 mx-auto mb-6 relative ${!isRunning && !isStartingPreview ? 'cursor-pointer group' : ''}`}
+                              onClick={!isRunning && !isStartingPreview && supportsPreview !== false ? start : undefined}
+                              className={`w-40 h-40 mx-auto mb-6 relative ${!isRunning && !isStartingPreview && supportsPreview !== false ? 'cursor-pointer group' : ''}`}
                             >
                               {/* Claudable Symbol with rotating animation when starting */}
                               <MotionDiv
@@ -2180,6 +2239,15 @@ export default function ChatPage({ params }: Params) {
                                       borderTopColor: 'transparent'
                                     }}
                                   />
+                                ) : supportsPreview === false ? (
+                                  // Show a "not available" icon for non-frontend projects
+                                  <MotionDiv
+                                    className="flex items-center justify-center opacity-50"
+                                  >
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z" fill="currentColor"/>
+                                    </svg>
+                                  </MotionDiv>
                                 ) : (
                                   <MotionDiv
                                     className="flex items-center justify-center"
@@ -2195,11 +2263,14 @@ export default function ChatPage({ params }: Params) {
                             </div>
                             
                             <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
-                              Preview Not Running
+                              {supportsPreview === false ? 'Preview Not Available' : 'Preview Not Running'}
                             </h3>
                             
                             <p className="text-gray-600 dark:text-gray-400 max-w-lg mx-auto">
-                              Start your development server to see live changes
+                              {supportsPreview === false 
+                                ? `${previewCheckReason}. Use the code view to explore the project.`
+                                : 'Start your development server to see live changes'
+                              }
                             </p>
                           </>
                         )}

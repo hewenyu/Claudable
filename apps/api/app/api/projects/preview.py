@@ -18,6 +18,7 @@ from app.services.local_runtime import (
     start_preview_process,
     stop_preview_process,
 )
+from app.services.project_detector import is_frontend_project, get_frontend_framework
 
 router = APIRouter()
 
@@ -39,6 +40,12 @@ class PreviewLogsResponse(BaseModel):
     running: bool
 
 
+class ProjectTypeResponse(BaseModel):
+    is_frontend: bool
+    reason: str
+    framework: Optional[str] = None
+
+
 @router.post("/{project_id}/preview/start", response_model=PreviewStatusResponse)
 async def start_preview(
     project_id: str,
@@ -50,6 +57,17 @@ async def start_preview(
     project = db.get(ProjectModel, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+
+    # Check if this is a frontend project that supports preview
+    if not project.repo_path:
+        raise HTTPException(status_code=400, detail="Project repository path not found")
+    
+    is_frontend, reason = is_frontend_project(project.repo_path)
+    if not is_frontend:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Preview not available: {reason}. Only frontend projects support preview functionality."
+        )
 
     # Check if preview is already running
     status = preview_status(project_id)
@@ -171,6 +189,17 @@ async def restart_preview(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
+    # Check if this is a frontend project that supports preview
+    if not project.repo_path:
+        raise HTTPException(status_code=400, detail="Project repository path not found")
+    
+    is_frontend, reason = is_frontend_project(project.repo_path)
+    if not is_frontend:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Preview not available: {reason}. Only frontend projects support preview functionality."
+        )
+
     # Stop if running
     status = preview_status(project_id)
     if status == "running":
@@ -218,3 +247,29 @@ async def get_all_error_logs(project_id: str, db: Session = Depends(get_db)):
     all_logs = get_all_preview_logs(project_id)
 
     return {"logs": all_logs, "project_id": project_id}
+
+
+
+@router.get("/{project_id}/preview/check", response_model=ProjectTypeResponse)
+async def check_preview_support(project_id: str, db: Session = Depends(get_db)):
+    """Check if a project supports preview functionality"""
+
+    project = db.get(ProjectModel, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if not project.repo_path:
+        return ProjectTypeResponse(
+            is_frontend=False,
+            reason="Project repository path not found",
+            framework=None
+        )
+    
+    is_frontend, reason = is_frontend_project(project.repo_path)
+    framework = get_frontend_framework(project.repo_path) if is_frontend else None
+
+    return ProjectTypeResponse(
+        is_frontend=is_frontend,
+        reason=reason,
+        framework=framework
+    )
