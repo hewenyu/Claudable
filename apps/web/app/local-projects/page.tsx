@@ -49,6 +49,8 @@ export default function LocalProjectsPage() {
   const [cloning, setCloning] = useState(false);
   const [showCloneModal, setShowCloneModal] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [workspaceToDelete, setWorkspaceToDelete] = useState<WorkspaceProject | null>(null);
+  const [deleting, setDeleting] = useState(false);
   
   const router = useRouter();
 
@@ -181,6 +183,35 @@ export default function LocalProjectsPage() {
     }
   };
 
+  const handleDeleteWorkspace = async (workspace: WorkspaceProject) => {
+    setWorkspaceToDelete(workspace);
+  };
+
+  const confirmDeleteWorkspace = async () => {
+    if (!workspaceToDelete) return;
+    
+    setDeleting(true);
+    try {
+      const response = await fetch(`${API_BASE}/api/workspace/${workspaceToDelete.id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        showToast('Workspace deleted successfully', 'success');
+        setWorkspaceToDelete(null);
+        await loadWorkspaces();
+      } else {
+        const error = await response.json().catch(() => ({ detail: 'Failed to delete workspace' }));
+        showToast(error.detail || 'Failed to delete workspace', 'error');
+      }
+    } catch (error) {
+      console.error('Failed to delete workspace:', error);
+      showToast('Failed to delete workspace', 'error');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const formatTime = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -227,26 +258,41 @@ export default function LocalProjectsPage() {
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Active Workspaces</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {workspaces.map((workspace) => (
-                <motion.div
+                <div
                   key={workspace.id}
-                  className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-orange-500 transition-colors cursor-pointer"
-                  onClick={() => router.push(`/${workspace.id}/chat`)}
-                  whileHover={{ scale: 1.02 }}
+                  className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-orange-500 transition-colors relative group hover:scale-105 duration-200"
                 >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="font-medium text-gray-900 dark:text-white">{workspace.name}</h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">{workspace.local_git_project_name}</p>
+                  <div 
+                    className="cursor-pointer"
+                    onClick={() => router.push(`/${workspace.id}/chat`)}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-gray-900 dark:text-white truncate">{workspace.name}</h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 truncate">{workspace.local_git_project_name}</p>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-orange-600 bg-orange-100 dark:bg-orange-900/20 px-2 py-1 rounded ml-2">
+                        <GitBranch className="w-3 h-3" />
+                        {workspace.current_branch}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1 text-xs text-orange-600 bg-orange-100 dark:bg-orange-900/20 px-2 py-1 rounded">
-                      <GitBranch className="w-3 h-3" />
-                      {workspace.current_branch}
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      Created {formatTime(workspace.created_at)}
                     </div>
                   </div>
-                  <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                    Created {formatTime(workspace.created_at)}
-                  </div>
-                </motion.div>
+                  
+                  {/* Delete button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteWorkspace(workspace);
+                    }}
+                    className="absolute top-2 right-2 p-1 text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                    title="Delete workspace"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               ))}
             </div>
           </div>
@@ -313,11 +359,7 @@ export default function LocalProjectsPage() {
         {/* Create Workspace Modal */}
         {showCreateWorkspace && selectedProject && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-white dark:bg-gray-900 rounded-lg p-6 w-full max-w-md mx-4"
-            >
+            <div className="bg-white dark:bg-gray-900 rounded-lg p-6 w-full max-w-md mx-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                 Create Workspace: {selectedProject.name}
               </h3>
@@ -367,18 +409,14 @@ export default function LocalProjectsPage() {
                   {creating ? 'Creating...' : 'Create Workspace'}
                 </button>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
 
         {/* Clone Repository Modal */}
         {showCloneModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-white dark:bg-gray-900 rounded-lg p-6 w-full max-w-md mx-4"
-            >
+            <div className="bg-white dark:bg-gray-900 rounded-lg p-6 w-full max-w-md mx-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                 Clone Repository
               </h3>
@@ -426,17 +464,46 @@ export default function LocalProjectsPage() {
                   {cloning ? 'Cloning...' : 'Clone'}
                 </button>
               </div>
-            </motion.div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Workspace Confirmation Modal */}
+        {workspaceToDelete && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-900 rounded-lg p-6 w-full max-w-md mx-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                Delete Workspace
+              </h3>
+              
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                Are you sure you want to delete the workspace "{workspaceToDelete.name}"? This action cannot be undone. 
+                The underlying Git project will not be affected.
+              </p>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setWorkspaceToDelete(null)}
+                  className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDeleteWorkspace}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {deleting ? 'Deleting...' : 'Delete Workspace'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
         {/* Toast Messages */}
         {toast && (
           <div className="fixed bottom-4 right-4 z-50">
-            <motion.div
-              initial={{ opacity: 0, y: 50, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 50, scale: 0.9 }}
+            <div
               className={`px-6 py-4 rounded-lg shadow-lg border flex items-center gap-3 max-w-sm backdrop-blur-lg ${
                 toast.type === 'success'
                   ? 'bg-green-500/20 border-green-500/30 text-green-400'
@@ -444,7 +511,7 @@ export default function LocalProjectsPage() {
               }`}
             >
               <p className="text-sm font-medium">{toast.message}</p>
-            </motion.div>
+            </div>
           </div>
         )}
       </div>
