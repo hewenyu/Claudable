@@ -11,6 +11,7 @@ from app.api.chat import router as chat_router
 from app.api.commits import router as commits_router
 from app.api.env import router as env_router
 from app.api.git_projects import router as git_projects_router
+from app.api.git_source_control import router as git_source_control_router
 from app.api.github import router as github_router
 from app.api.project_services import router as project_services_router
 from app.api.projects import router as projects_router
@@ -63,6 +64,7 @@ app.add_middleware(
 # Routers
 app.include_router(projects_router, prefix="/api/projects")
 app.include_router(git_projects_router)  # Already has /api/git-projects prefix
+app.include_router(git_source_control_router)  # Git source control API
 app.include_router(workspace_router)  # Already has /api/workspace prefix
 app.include_router(repo_router)
 app.include_router(commits_router)
