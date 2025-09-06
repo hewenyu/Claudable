@@ -1628,81 +1628,630 @@ export default function ChatPage({ params }: Params) {
 
       <div className="h-screen bg-white dark:bg-black flex relative overflow-hidden">
         <div className="h-full w-full flex">
-          {/* 왼쪽: 채팅창 */}
-          <div
-            style={{ width: '30%' }}
-            className="h-full border-r border-gray-200 dark:border-gray-800 flex flex-col"
-          >
+          {/* 왼쪽: 파일 탐색기 */}
+          <div className="w-64 flex-shrink-0 bg-gray-50 dark:bg-[#0a0a0a] border-r border-gray-200 dark:border-[#1a1a1a] flex flex-col">
+            {/* Tab Bar */}
+            <div className="flex border-b border-gray-200 dark:border-[#1a1a1a] bg-gray-100 dark:bg-[#0f0f0f]">
+              <button
+                onClick={() => setSidebarTab('explorer')}
+                className={`flex-1 px-3 py-2 text-[11px] font-medium transition-colors ${
+                  sidebarTab === 'explorer'
+                    ? 'bg-gray-50 dark:bg-[#0a0a0a] text-gray-900 dark:text-white border-b-2 border-b-blue-500 dark:border-b-[#007acc]'
+                    : 'text-gray-600 dark:text-[#6a6a6a] hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-[#1a1a1a]'
+                }`}
+                title="Explorer"
+              >
+                <div className="flex items-center justify-center gap-1">
+                  <FaFolder className="w-3 h-3" />
+                  <span className="hidden sm:inline">Explorer</span>
+                </div>
+              </button>
+              <button
+                onClick={() => setSidebarTab('source-control')}
+                className={`flex-1 px-3 py-2 text-[11px] font-medium transition-colors ${
+                  sidebarTab === 'source-control'
+                    ? 'bg-gray-50 dark:bg-[#0a0a0a] text-gray-900 dark:text-white border-b-2 border-b-blue-500 dark:border-b-[#007acc]'
+                    : 'text-gray-600 dark:text-[#6a6a6a] hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-[#1a1a1a]'
+                }`}
+                title="Source Control"
+              >
+                <div className="flex items-center justify-center gap-1">
+                  <FaGitAlt className="w-3 h-3" />
+                  <span className="hidden sm:inline">Git</span>
+                </div>
+              </button>
+              {/* Refresh Button */}
+              {sidebarTab === 'explorer' && (
+                <button
+                  onClick={() => loadTree('.')}
+                  className="px-2 py-2 text-[11px] font-medium text-gray-600 dark:text-[#6a6a6a] hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-[#1a1a1a] transition-colors"
+                  title="Refresh Explorer"
+                >
+                  <FaSync className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            {/* Tab Content */}
+            <div className="flex-1 overflow-hidden">
+              {sidebarTab === 'explorer' ? (
+                /* File Explorer */
+                <div className="h-full overflow-y-auto bg-gray-50 dark:bg-[#0a0a0a] custom-scrollbar">
+                  {!tree || tree.length === 0 ? (
+                    <div className="px-3 py-8 text-center text-[11px] text-gray-600 dark:text-[#6a6a6a] select-none">
+                      No files found
+                    </div>
+                  ) : (
+                    <TreeView 
+                      entries={tree || []}
+                      selectedFile={selectedFile}
+                      expandedFolders={expandedFolders}
+                      folderContents={folderContents}
+                      onToggleFolder={toggleFolder}
+                      onSelectFile={openFile}
+                      onLoadFolder={handleLoadFolder}
+                      level={0}
+                      parentPath=""
+                      getFileIcon={getFileIcon}
+                    />
+                  )}
+                </div>
+              ) : (
+                /* Git Source Control */
+                <GitSourceControl 
+                  projectId={projectId}
+                  isVisible={sidebarTab === 'source-control'}
+                  onViewDiff={handleViewDiff}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* 중간: 파일 내용 및 프리뷰 영역 */}
+          <div className="flex-1 h-full flex flex-col bg-black">
+            {/* 컨텐츠 영역 */}
+            <div className="flex-1 min-h-0 flex flex-col">
+              {/* Controls Bar */}
+              <div className="bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 px-4 h-[73px] flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={() => router.push('/')}
+                    className="flex items-center justify-center w-8 h-8 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                    title="Back to home"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M19 12H5M12 19L5 12L12 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
+                  <div>
+                    <h1 className="text-lg font-semibold text-gray-900 dark:text-white">{projectName || 'Loading...'}</h1>
+                    {projectDescription && (
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {projectDescription}
+                      </p>
+                    )}
+                    {/* Git Branch Selector for Workspaces */}
+                    {isWorkspace && currentBranch && (
+                      <div className="mt-2 relative" data-branch-dropdown>
+                        <button
+                          onClick={() => setShowBranchDropdown(!showBranchDropdown)}
+                          disabled={switchingBranch}
+                          className="flex items-center gap-2 px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-md hover:bg-blue-200 dark:hover:bg-blue-900/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Switch branch"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M6 3v12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M18 9a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M6 21a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M15 7v4.5a3.5 3.5 0 0 1-7 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                          <span>{switchingBranch ? 'Switching...' : currentBranch}</span>
+                          {!switchingBranch && (
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          )}
+                        </button>
+                        
+                        {/* Branch Dropdown */}
+                        {showBranchDropdown && availableBranches.length > 0 && (
+                          <div className="absolute top-full left-0 mt-1 z-50 min-w-[150px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                            {availableBranches.map((branch) => (
+                              <button
+                                key={branch}
+                                onClick={() => switchBranch(branch)}
+                                disabled={switchingBranch || branch === currentBranch}
+                                className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                                  branch === currentBranch 
+                                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium' 
+                                    : 'text-gray-700 dark:text-gray-300'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  {branch === currentBranch && (
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                      <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    </svg>
+                                  )}
+                                  <span>{branch}</span>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {/* 토글 스위치 */}
+                  <div className="flex items-center bg-gray-100 dark:bg-gray-900 rounded-lg p-1">
+                    {/* Only show preview button if project supports it */}
+                    {supportsPreview !== false && (
+                      <button
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                          showPreview 
+                            ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white' 
+                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                        }`}
+                        onClick={() => setShowPreview(true)}
+                        title={supportsPreview === null ? 'Checking preview support...' : 'Show preview'}
+                        disabled={supportsPreview === null}
+                      >
+                        <span className="w-4 h-4 flex items-center justify-center"><FaDesktop size={16} /></span>
+                      </button>
+                    )}
+                    <button
+                      className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                        !showPreview || supportsPreview === false
+                          ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white' 
+                          : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                      }`}
+                      onClick={() => setShowPreview(false)}
+                      title="Show code"
+                    >
+                      <span className="w-4 h-4 flex items-center justify-center"><FaCode size={16} /></span>
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  {/* Settings Button */}
+                  <button 
+                    onClick={() => setShowGlobalSettings(true)}
+                    className="h-9 w-9 flex items-center justify-center bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                    title="Settings"
+                  >
+                    <FaCog size={16} />
+                  </button>
+                  
+                  {/* Stop Button */}
+                  {showPreview && previewUrl && (
+                    <button 
+                      className="h-9 px-3 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                      onClick={stop}
+                    >
+                      <FaStop size={12} />
+                      Stop
+                    </button>
+                  )}
+                  
+                  {/* Publish/Update */}
+                  {showPreview && previewUrl && (
+                    <div className="relative">
+                    <button
+                      className="h-9 flex items-center gap-2 px-3 bg-black text-white rounded-lg text-sm font-medium transition-colors hover:bg-gray-900 border border-black/10 dark:border-white/10 shadow-sm"
+                      onClick={() => setShowPublishPanel(true)}
+                    >
+                      <FaRocket size={14} />
+                      Publish
+                      {deploymentStatus === 'deploying' && (
+                        <span className="ml-2 inline-block w-2 h-2 rounded-full bg-amber-400"></span>
+                      )}
+                      {deploymentStatus === 'ready' && (
+                        <span className="ml-2 inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
+                      )}
+                    </button>
+                  </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Content Area - Preview or Code */}
+              <div className="flex-1 relative bg-black overflow-hidden">
+                {/* Preview Error Notification */}
+                {previewError && (
+                  <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 max-w-md">
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-4 py-3 shadow-lg">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 mt-0.5">
+                          <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-red-800 dark:text-red-200">{previewError}</p>
+                        </div>
+                        <button
+                          onClick={() => setPreviewError(null)}
+                          className="flex-shrink-0 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-200"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <AnimatePresence mode="wait">
+                  {showPreview ? (
+                    <MotionDiv
+                      key="preview"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      style={{ height: '100%' }}
+                    >
+                      {previewUrl ? (
+                        <div className="relative w-full h-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                          <div 
+                            className={`bg-white dark:bg-gray-900 ${
+                              deviceMode === 'mobile' 
+                                ? 'w-[375px] h-[667px] rounded-[25px] border-8 border-gray-800 shadow-2xl' 
+                                : 'w-full h-full'
+                            } overflow-hidden`}
+                          >
+                            <iframe 
+                              ref={iframeRef}
+                              className="w-full h-full border-none bg-white dark:bg-gray-800"
+                              src={previewUrl}
+                              onError={() => {
+                                // Show error overlay
+                                const overlay = document.getElementById('iframe-error-overlay');
+                                if (overlay) overlay.style.display = 'flex';
+                              }}
+                              onLoad={() => {
+                                // Hide error overlay when loaded successfully
+                                const overlay = document.getElementById('iframe-error-overlay');
+                                if (overlay) overlay.style.display = 'none';
+                              }}
+                            />
+                            
+                            {/* Error overlay */}
+                            <div 
+                              id="iframe-error-overlay"
+                              className="absolute inset-0 bg-gray-50 dark:bg-gray-900 flex items-center justify-center z-10"
+                              style={{ display: 'none' }}
+                            >
+                              <div className="text-center max-w-md mx-auto p-6">
+                                <div className="text-4xl mb-4">🔄</div>
+                                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                                  Connection Issue
+                                </h3>
+                                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                                  The preview couldn't load properly. Try clicking the refresh button to reload the page.
+                                </p>
+                                <button
+                                  className="flex items-center gap-2 mx-auto px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+                                  onClick={() => {
+                                    const iframe = document.querySelector('iframe');
+                                    if (iframe) {
+                                      iframe.src = iframe.src;
+                                    }
+                                    const overlay = document.getElementById('iframe-error-overlay');
+                                    if (overlay) overlay.style.display = 'none';
+                                  }}
+                                >
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M1 4v6h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                  Refresh Now
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center bg-gray-50 dark:bg-black relative">
+                          {/* Gradient background similar to main page */}
+                          <div className="absolute inset-0">
+                            <div className="absolute inset-0 bg-white dark:bg-black" />
+                            <div 
+                              className="absolute inset-0 dark:block hidden transition-all duration-1000 ease-in-out"
+                              style={{
+                                background: `radial-gradient(circle at 50% 100%, 
+                                  ${assistantBrandColors[preferredCli] || assistantBrandColors.claude}66 0%, 
+                                  ${assistantBrandColors[preferredCli] || assistantBrandColors.claude}4D 25%, 
+                                  ${assistantBrandColors[preferredCli] || assistantBrandColors.claude}33 50%, 
+                                  transparent 70%)`
+                              }}
+                            />
+                            {/* Light mode gradient - subtle */}
+                            <div 
+                              className="absolute inset-0 block dark:hidden transition-all duration-1000 ease-in-out"
+                              style={{
+                                background: `radial-gradient(circle at 50% 100%, 
+                                  ${assistantBrandColors[preferredCli] || assistantBrandColors.claude}40 0%, 
+                                  ${assistantBrandColors[preferredCli] || assistantBrandColors.claude}26 25%, 
+                                  transparent 50%)`
+                              }}
+                            />
+                          </div>
+                          
+                          {/* Content with z-index to be above gradient */}
+                          <div className="relative z-10 w-full h-full flex items-center justify-center">
+                            {isStartingPreview ? (
+                              <MotionDiv 
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="text-center"
+                              >
+                                {/* Claudable Symbol with loading spinner */}
+                                <div className="w-40 h-40 mx-auto mb-6 relative">
+                                  <div 
+                                    className="w-full h-full"
+                                    style={{
+                                      backgroundColor: assistantBrandColors[preferredCli] || assistantBrandColors.claude,
+                                      mask: 'url(/Symbol_white.png) no-repeat center/contain',
+                                      WebkitMask: 'url(/Symbol_white.png) no-repeat center/contain',
+                                      opacity: 0.9
+                                    }}
+                                  />
+                                  
+                                  {/* Loading spinner in center */}
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <div 
+                                      className="w-14 h-14 border-4 border-t-transparent rounded-full animate-spin"
+                                      style={{
+                                        borderColor: assistantBrandColors[preferredCli] || assistantBrandColors.claude,
+                                        borderTopColor: 'transparent'
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                                
+                                {/* Content */}
+                                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+                                  Starting Preview Server
+                                </h3>
+                                
+                                <div className="flex items-center justify-center gap-1 text-gray-600 dark:text-gray-400">
+                                  <span>{previewInitializationMessage}</span>
+                                </div>
+                              </MotionDiv>
+                            ) : (
+                              <div className="text-center">
+                                <MotionDiv
+                                  initial={{ opacity: 0, y: 20 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ duration: 0.6, ease: "easeOut" }}
+                                >
+                                  {/* Claudable Symbol */}
+                                  {hasActiveRequests ? (
+                                    <>
+                                      <div className="w-40 h-40 mx-auto mb-6 relative">
+                                        <MotionDiv
+                                          animate={{ rotate: 360 }}
+                                          transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                                          style={{ transformOrigin: "center center" }}
+                                          className="w-full h-full"
+                                        >
+                                          <div 
+                                            className="w-full h-full"
+                                            style={{
+                                              backgroundColor: assistantBrandColors[preferredCli] || assistantBrandColors.claude,
+                                              mask: 'url(/Symbol_white.png) no-repeat center/contain',
+                                              WebkitMask: 'url(/Symbol_white.png) no-repeat center/contain',
+                                              opacity: 0.9
+                                            }}
+                                          />
+                                        </MotionDiv>
+                                      </div>
+                                      
+                                      <h3 className="text-2xl font-bold mb-3 relative overflow-hidden inline-block">
+                                        <span 
+                                          className="relative"
+                                          style={{
+                                            background: `linear-gradient(90deg, 
+                                              #6b7280 0%, 
+                                              #6b7280 30%, 
+                                              #ffffff 50%, 
+                                              #6b7280 70%, 
+                                              #6b7280 100%)`,
+                                            backgroundSize: '200% 100%',
+                                            WebkitBackgroundClip: 'text',
+                                            backgroundClip: 'text',
+                                            WebkitTextFillColor: 'transparent',
+                                            animation: 'shimmerText 5s linear infinite'
+                                          }}
+                                        >
+                                          Building...
+                                        </span>
+                                      </h3>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div
+                                        onClick={!isRunning && !isStartingPreview && supportsPreview !== false ? start : undefined}
+                                        className={`w-40 h-40 mx-auto mb-6 relative ${!isRunning && !isStartingPreview && supportsPreview !== false ? 'cursor-pointer group' : ''}`}
+                                      >
+                                        {/* Claudable Symbol with rotating animation when starting */}
+                                        <MotionDiv
+                                          className="w-full h-full"
+                                          animate={isStartingPreview ? { rotate: 360 } : {}}
+                                          transition={{ duration: 6, repeat: isStartingPreview ? Infinity : 0, ease: "linear" }}
+                                        >
+                                          <div 
+                                            className="w-full h-full"
+                                            style={{
+                                              backgroundColor: assistantBrandColors[preferredCli] || assistantBrandColors.claude,
+                                              mask: 'url(/Symbol_white.png) no-repeat center/contain',
+                                              WebkitMask: 'url(/Symbol_white.png) no-repeat center/contain',
+                                              opacity: 0.9
+                                            }}
+                                          />
+                                        </MotionDiv>
+                                        
+                                        {/* Icon in Center - Play or Loading */}
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                          {isStartingPreview ? (
+                                            <div 
+                                              className="w-14 h-14 border-4 border-t-transparent rounded-full animate-spin"
+                                              style={{
+                                                borderColor: assistantBrandColors[preferredCli] || assistantBrandColors.claude,
+                                                borderTopColor: 'transparent'
+                                              }}
+                                            />
+                                          ) : supportsPreview === false ? (
+                                            // Show a "not available" icon for non-frontend projects
+                                            <MotionDiv
+                                              className="flex items-center justify-center opacity-50"
+                                            >
+                                              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z" fill="currentColor"/>
+                                              </svg>
+                                            </MotionDiv>
+                                          ) : (
+                                            <MotionDiv
+                                              className="flex items-center justify-center"
+                                              whileHover={{ scale: 1.2 }}
+                                              whileTap={{ scale: 0.9 }}
+                                            >
+                                              <FaPlay 
+                                                size={32}
+                                              />
+                                            </MotionDiv>
+                                          )}
+                                        </div>
+                                      </div>
+                                      
+                                      <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+                                        {supportsPreview === false ? 'Preview Not Available' : 'Preview Not Running'}
+                                      </h3>
+                                      
+                                      <p className="text-gray-600 dark:text-gray-400 max-w-lg mx-auto">
+                                        {supportsPreview === false 
+                                          ? `${previewCheckReason}. Use the code view to explore the project.`
+                                          : 'Start your development server to see live changes'
+                                        }
+                                      </p>
+                                    </>
+                                  )}
+                                </MotionDiv>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </MotionDiv>
+                  ) : (
+                    /* Code View */
+                    <MotionDiv
+                      key="code"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="h-full flex bg-white dark:bg-gray-950"
+                    >
+                      {/* File content area */}
+                      <div className="flex-1 flex flex-col bg-white dark:bg-[#0d0d0d] min-w-0">
+                        {selectedFile ? (
+                          <>
+                            {/* File Tab */}
+                            <div className="flex-shrink-0 bg-gray-100 dark:bg-[#1a1a1a]">
+                              <div className="flex items-center">
+                                <div className="flex items-center gap-2 bg-white dark:bg-[#0d0d0d] px-3 py-1.5 border-t-2 border-t-blue-500 dark:border-t-[#007acc]">
+                                  <span className="w-4 h-4 flex items-center justify-center">
+                                    {getFileIcon(tree.find(e => e.path === selectedFile) || { path: selectedFile, type: 'file' })}
+                                  </span>
+                                  <span className="text-[13px] text-gray-700 dark:text-[#cccccc]" style={{ fontFamily: "'Segoe UI', Tahoma, sans-serif" }}>
+                                    {selectedFile.split('/').pop()}
+                                    {isDiffView && (
+                                      <span className="text-[11px] text-blue-600 dark:text-blue-400 ml-2 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 rounded">
+                                        DIFF
+                                      </span>
+                                    )}
+                                  </span>
+                                  {isFileUpdating && (
+                                    <span className="text-[11px] text-green-600 dark:text-green-400 ml-auto mr-2">
+                                      Updated
+                                    </span>
+                                  )}
+                                  <button 
+                                    className="text-gray-700 dark:text-[#cccccc] hover:bg-gray-200 dark:hover:bg-[#383838] ml-2 px-1 rounded"
+                                    onClick={() => {
+                                      setSelectedFile('');
+                                      setContent('');
+                                      setIsDiffView(false);
+                                      setDiffContent(null);
+                                      setDiffFilePath(null);
+                                    }}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Code Editor */}
+                            <div className="flex-1 overflow-hidden">
+                              <div className="w-full h-full flex bg-white dark:bg-[#0d0d0d] overflow-hidden">
+                                {/* Line Numbers */}
+                                <div className="bg-gray-50 dark:bg-[#0d0d0d] px-3 py-4 select-none flex-shrink-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
+                                  <div className="text-[13px] font-mono text-gray-500 dark:text-[#858585] leading-[19px]">
+                                    {(content || '').split('\n').map((_, index) => (
+                                      <div key={index} className="text-right pr-2">
+                                        {index + 1}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                                {/* Code Content */}
+                                <div className="flex-1 overflow-auto custom-scrollbar">
+                                  <pre className="p-4 text-[13px] leading-[19px] font-mono text-gray-800 dark:text-[#d4d4d4] whitespace-pre" style={{ fontFamily: "'Fira Code', 'Consolas', 'Monaco', monospace" }}>
+                                    <code 
+                                      className={`language-${isDiffView ? 'diff' : getFileLanguage(selectedFile)}`}
+                                      dangerouslySetInnerHTML={{
+                                        __html: hljs && content ? hljs.highlight(content, { language: isDiffView ? 'diff' : getFileLanguage(selectedFile) }).value : (content || '')
+                                      }}
+                                    />
+                                  </pre>
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          /* Welcome Screen */
+                          <div className="flex-1 flex items-center justify-center bg-white dark:bg-[#0d0d0d]">
+                            <div className="text-center">
+                              <span className="w-16 h-16 mb-4 opacity-10 text-gray-400 dark:text-[#3c3c3c] mx-auto flex items-center justify-center"><FaCode size={64} /></span>
+                              <h3 className="text-lg font-medium text-gray-700 dark:text-[#cccccc] mb-2">
+                                Welcome to Code Editor
+                              </h3>
+                              <p className="text-sm text-gray-500 dark:text-[#858585]">
+                                Select a file from the explorer to start viewing code
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </MotionDiv>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+          </div>
+
+          {/* 오른쪽: 채팅창 (기존 왼쪽에서 이동) */}
+          <div className="w-80 flex-shrink-0 h-full border-l border-gray-200 dark:border-gray-800 flex flex-col">
             {/* 채팅 헤더 */}
             <div className="bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 p-4 h-[73px] flex items-center">
               <div className="flex items-center gap-3">
-                <button 
-                  onClick={() => router.push('/')}
-                  className="flex items-center justify-center w-8 h-8 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
-                  title="Back to home"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M19 12H5M12 19L5 12L12 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </button>
                 <div>
-                  <h1 className="text-lg font-semibold text-gray-900 dark:text-white">{projectName || 'Loading...'}</h1>
-                  {projectDescription && (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {projectDescription}
-                    </p>
-                  )}
-                  {/* Git Branch Selector for Workspaces */}
-                  {isWorkspace && currentBranch && (
-                    <div className="mt-2 relative" data-branch-dropdown>
-                      <button
-                        onClick={() => setShowBranchDropdown(!showBranchDropdown)}
-                        disabled={switchingBranch}
-                        className="flex items-center gap-2 px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-md hover:bg-blue-200 dark:hover:bg-blue-900/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Switch branch"
-                      >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M6 3v12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M18 9a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M6 21a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M15 7v4.5a3.5 3.5 0 0 1-7 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                        <span>{switchingBranch ? 'Switching...' : currentBranch}</span>
-                        {!switchingBranch && (
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        )}
-                      </button>
-                      
-                      {/* Branch Dropdown */}
-                      {showBranchDropdown && availableBranches.length > 0 && (
-                        <div className="absolute top-full left-0 mt-1 z-50 min-w-[150px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                          {availableBranches.map((branch) => (
-                            <button
-                              key={branch}
-                              onClick={() => switchBranch(branch)}
-                              disabled={switchingBranch || branch === currentBranch}
-                              className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                                branch === currentBranch 
-                                  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium' 
-                                  : 'text-gray-700 dark:text-gray-300'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2">
-                                {branch === currentBranch && (
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                  </svg>
-                                )}
-                                <span>{branch}</span>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Chat</h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Conversation with {preferredCli === 'claude' ? 'Claude' : preferredCli}
+                  </p>
                 </div>
               </div>
             </div>
@@ -1736,7 +2285,7 @@ export default function ChatPage({ params }: Params) {
             </div>
             
             {/* 간단한 입력 영역 */}
-            <div className="p-4 rounded-bl-2xl">
+            <div className="p-4">
               <ChatInput 
                 onSendMessage={(message, images) => {
                   // Pass images to runAct
@@ -1754,8 +2303,6 @@ export default function ChatPage({ params }: Params) {
               />
             </div>
           </div>
-
-          {/* 오른쪽: Preview/Code 영역 */}
           <div className="h-full flex flex-col bg-black" style={{ width: '70%' }}>
             {/* 컨텐츠 영역 */}
             <div className="flex-1 min-h-0 flex flex-col">
