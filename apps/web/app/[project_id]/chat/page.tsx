@@ -2287,166 +2287,165 @@ export default function ChatPage({ params }: Params) {
         )}
       </div>
 
-          {/* 오른쪽: 채팅 인터페이스 */}
-          <div 
-            className="w-80 flex-shrink-0 border-l border-gray-200 dark:border-gray-800 flex flex-col bg-white dark:bg-black"
-          >
-            {/* 채팅 헤더 */}
-            <div className="bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 p-4 h-[73px] flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white"
-                     style={{ backgroundColor: assistantBrandColors[preferredCli] || assistantBrandColors.claude }}>
-                  <img 
-                    src="/Symbol_white.png" 
-                    alt="Claudable" 
-                    className="w-5 h-5"
-                    style={{
-                      filter: hexToFilter(assistantBrandColors[preferredCli] || assistantBrandColors.claude)
-                    }}
-                  />
+      {/* 오른쪽: 채팅 인터페이스 */}
+      <div 
+        className="w-80 flex-shrink-0 border-l border-gray-200 dark:border-gray-800 flex flex-col bg-white dark:bg-black"
+      >
+        {/* 채팅 헤더 */}
+        <div className="bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 p-4 h-[73px] flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white"
+                 style={{ backgroundColor: assistantBrandColors[preferredCli] || assistantBrandColors.claude }}>
+              <img 
+                src="/Symbol_white.png" 
+                alt="Claudable" 
+                className="w-5 h-5"
+                style={{
+                  filter: hexToFilter(assistantBrandColors[preferredCli] || assistantBrandColors.claude)
+                }}
+              />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Claudable</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
+                {preferredCli} • {selectedModel}
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {/* Settings Button */}
+            <button 
+              onClick={() => setShowGlobalSettings(true)}
+              className="h-8 w-8 flex items-center justify-center bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              title="Settings"
+            >
+              <FaCog size={14} />
+            </button>
+          </div>
+        </div>
+        
+        {/* 채팅 로그 영역 */}
+        <div className="flex-1 min-h-0">
+          <ChatLog 
+            projectId={projectId} 
+            onSessionStatusChange={(isRunningValue) => {
+              console.log('🔍 [DEBUG] Session status change:', isRunningValue);
+              setIsRunning(isRunningValue);
+              // Agent 작업 완료 상태 추적 및 자동 preview 시작
+              if (!isRunningValue && hasInitialPrompt && !agentWorkComplete && !previewUrl) {
+                setAgentWorkComplete(true);
+                // Save to localStorage
+                localStorage.setItem(`project_${projectId}_taskComplete`, 'true');
+                // Initial prompt 작업 완료 후 자동으로 preview 서버 시작
+                start();
+              }
+              // Refresh file explorer when task completes
+              if (!isRunningValue) {
+                setTimeout(() => {
+                  loadTree('.');
+                }, 500); // Refresh after task completion
+              }
+            }}
+            onProjectStatusUpdate={handleProjectStatusUpdate}
+            startRequest={startRequest}
+            completeRequest={completeRequest}
+          />
+        </div>
+        
+        {/* 간단한 입력 영역 */}
+        <div className="p-4">
+          <ChatInput 
+            onSendMessage={(message, images) => {
+              // Pass images to runAct
+              runAct(message, images);
+            }}
+            disabled={isRunning}
+            placeholder={mode === 'act' ? "Ask Claudable..." : "Chat with Claudable..."}
+            mode={mode}
+            onModeChange={setMode}
+            projectId={projectId}
+            preferredCli={preferredCli}
+            selectedModel={selectedModel}
+            thinkingMode={thinkingMode}
+            onThinkingModeChange={setThinkingMode}
+          />
+        </div>
+      </div>
+
+      {/* 떠다니는 미리보기 컨트롤 패널 */}
+      {supportsPreview !== false && (
+        <div className="absolute top-4 right-4 z-40">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-3">
+            <div className="flex items-center gap-2">
+              {/* Preview Controls */}
+              {previewUrl ? (
+                <div className="flex items-center gap-2">
+                  {/* Device Mode Toggle */}
+                  <div className="h-8 flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-md px-1">
+                    <button
+                      aria-label="Desktop preview"
+                      className={`h-6 w-6 flex items-center justify-center rounded transition-colors ${
+                        deviceMode === 'desktop' 
+                          ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30' 
+                          : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+                      }`}
+                      onClick={() => setDeviceMode('desktop')}
+                    >
+                      <FaDesktop size={12} />
+                    </button>
+                    <button
+                      aria-label="Mobile preview"
+                      className={`h-6 w-6 flex items-center justify-center rounded transition-colors ${
+                        deviceMode === 'mobile' 
+                          ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30' 
+                          : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+                      }`}
+                      onClick={() => setDeviceMode('mobile')}
+                    >
+                      <FaMobileAlt size={12} />
+                    </button>
+                  </div>
+                  
+                  <button 
+                    className="h-8 px-3 bg-red-500 hover:bg-red-600 text-white rounded-md text-sm font-medium transition-colors flex items-center gap-1"
+                    onClick={stop}
+                  >
+                    <FaStop size={10} />
+                    Stop
+                  </button>
+                  
+                  <button
+                    className="h-8 flex items-center gap-2 px-3 bg-black text-white rounded-md text-sm font-medium transition-colors hover:bg-gray-900 border border-black/10 dark:border-white/10 shadow-sm"
+                    onClick={() => setShowPublishPanel(true)}
+                  >
+                    <FaRocket size={12} />
+                    Publish
+                    {deploymentStatus === 'deploying' && (
+                      <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                    )}
+                    {deploymentStatus === 'ready' && (
+                      <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    )}
+                  </button>
                 </div>
-                <div>
-                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Claudable</h2>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
-                    {preferredCli} • {selectedModel}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                {/* Settings Button */}
+              ) : (
                 <button 
-                  onClick={() => setShowGlobalSettings(true)}
-                  className="h-8 w-8 flex items-center justify-center bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                  title="Settings"
+                  onClick={!isRunning && !isStartingPreview && supportsPreview !== false ? start : undefined}
+                  disabled={isRunning || isStartingPreview || supportsPreview === false}
+                  className="h-8 px-3 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white rounded-md text-sm font-medium transition-colors flex items-center gap-1"
                 >
-                  <FaCog size={14} />
+                  <FaPlay size={10} />
+                  {isStartingPreview ? 'Starting...' : 'Start Preview'}
                 </button>
-              </div>
-            </div>
-            
-            {/* 채팅 로그 영역 */}
-            <div className="flex-1 min-h-0">
-              <ChatLog 
-                projectId={projectId} 
-                onSessionStatusChange={(isRunningValue) => {
-                  console.log('🔍 [DEBUG] Session status change:', isRunningValue);
-                  setIsRunning(isRunningValue);
-                  // Agent 작업 완료 상태 추적 및 자동 preview 시작
-                  if (!isRunningValue && hasInitialPrompt && !agentWorkComplete && !previewUrl) {
-                    setAgentWorkComplete(true);
-                    // Save to localStorage
-                    localStorage.setItem(`project_${projectId}_taskComplete`, 'true');
-                    // Initial prompt 작업 완료 후 자동으로 preview 서버 시작
-                    start();
-                  }
-                  // Refresh file explorer when task completes
-                  if (!isRunningValue) {
-                    setTimeout(() => {
-                      loadTree('.');
-                    }, 500); // Refresh after task completion
-                  }
-                }}
-                onProjectStatusUpdate={handleProjectStatusUpdate}
-                startRequest={startRequest}
-                completeRequest={completeRequest}
-              />
-            </div>
-            
-            {/* 간단한 입력 영역 */}
-            <div className="p-4">
-              <ChatInput 
-                onSendMessage={(message, images) => {
-                  // Pass images to runAct
-                  runAct(message, images);
-                }}
-                disabled={isRunning}
-                placeholder={mode === 'act' ? "Ask Claudable..." : "Chat with Claudable..."}
-                mode={mode}
-                onModeChange={setMode}
-                projectId={projectId}
-                preferredCli={preferredCli}
-                selectedModel={selectedModel}
-                thinkingMode={thinkingMode}
-                onThinkingModeChange={setThinkingMode}
-              />
+              )}
             </div>
           </div>
         </div>
+      )}
 
-        {/* 떠다니는 미리보기 컨트롤 패널 */}
-        {supportsPreview !== false && (
-          <div className="absolute top-4 right-4 z-40">
-            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-3">
-              <div className="flex items-center gap-2">
-                {/* Preview Controls */}
-                {previewUrl ? (
-                  <div className="flex items-center gap-2">
-                    {/* Device Mode Toggle */}
-                    <div className="h-8 flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-md px-1">
-                      <button
-                        aria-label="Desktop preview"
-                        className={`h-6 w-6 flex items-center justify-center rounded transition-colors ${
-                          deviceMode === 'desktop' 
-                            ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30' 
-                            : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
-                        }`}
-                        onClick={() => setDeviceMode('desktop')}
-                      >
-                        <FaDesktop size={12} />
-                      </button>
-                      <button
-                        aria-label="Mobile preview"
-                        className={`h-6 w-6 flex items-center justify-center rounded transition-colors ${
-                          deviceMode === 'mobile' 
-                            ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30' 
-                            : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
-                        }`}
-                        onClick={() => setDeviceMode('mobile')}
-                      >
-                        <FaMobileAlt size={12} />
-                      </button>
-                    </div>
-                    
-                    <button 
-                      className="h-8 px-3 bg-red-500 hover:bg-red-600 text-white rounded-md text-sm font-medium transition-colors flex items-center gap-1"
-                      onClick={stop}
-                    >
-                      <FaStop size={10} />
-                      Stop
-                    </button>
-                    
-                    <button
-                      className="h-8 flex items-center gap-2 px-3 bg-black text-white rounded-md text-sm font-medium transition-colors hover:bg-gray-900 border border-black/10 dark:border-white/10 shadow-sm"
-                      onClick={() => setShowPublishPanel(true)}
-                    >
-                      <FaRocket size={12} />
-                      Publish
-                      {deploymentStatus === 'deploying' && (
-                        <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                      )}
-                      {deploymentStatus === 'ready' && (
-                        <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                      )}
-                    </button>
-                  </div>
-                ) : (
-                  <button 
-                    onClick={!isRunning && !isStartingPreview && supportsPreview !== false ? start : undefined}
-                    disabled={isRunning || isStartingPreview || supportsPreview === false}
-                    className="h-8 px-3 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white rounded-md text-sm font-medium transition-colors flex items-center gap-1"
-                  >
-                    <FaPlay size={10} />
-                    {isStartingPreview ? 'Starting...' : 'Start Preview'}
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 전체 미리보기 오버레이 */}
-        {showPreview && (
+      {/* 전체 미리보기 오버레이 */}
+      {showPreview && (
           <div className="absolute inset-0 z-30 bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
             {/* Preview Error Notification */}
             {previewError && (
@@ -2737,7 +2736,7 @@ export default function ChatPage({ params }: Params) {
             </button>
           </div>
         )}
-      </div>>
+      </div>
 
       
 
