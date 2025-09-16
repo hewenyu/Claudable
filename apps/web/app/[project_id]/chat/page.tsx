@@ -200,6 +200,23 @@ export default function ChatPage({ params }: Params) {
   const initialPromptSentRef = useRef(false);
   const [showPublishPanel, setShowPublishPanel] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'explorer' | 'source-control'>('explorer');
+  const [chatPanelWidth, setChatPanelWidth] = useState(() => {
+    // Load saved width from localStorage, default to 480px
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('chatPanelWidth');
+      return saved ? parseInt(saved, 10) : 480;
+    }
+    return 480;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const [wordWrap, setWordWrap] = useState(() => {
+    // Load word wrap preference from localStorage, default to true
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('wordWrap');
+      return saved ? JSON.parse(saved) : true;
+    }
+    return true;
+  });
   const [publishLoading, setPublishLoading] = useState(false);
   const [githubConnected, setGithubConnected] = useState<boolean | null>(null);
   const [vercelConnected, setVercelConnected] = useState<boolean | null>(null);
@@ -1520,13 +1537,67 @@ export default function ChatPage({ params }: Params) {
     };
   }, [showBranchDropdown]);
 
+  // Chat panel resize functionality
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      
+      const newWidth = window.innerWidth - e.clientX;
+      // Constrain width between 300px and 60% of screen width
+      const minWidth = 300;
+      const maxWidth = window.innerWidth * 0.6;
+      const constrainedWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+      
+      setChatPanelWidth(constrainedWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    } else {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing]);
+
+  // Save chat panel width to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('chatPanelWidth', chatPanelWidth.toString());
+    }
+  }, [chatPanelWidth]);
+
+  // Save word wrap preference to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('wordWrap', JSON.stringify(wordWrap));
+    }
+  }, [wordWrap]);
 
   // Show loading UI if project is initializing
 
   return (
     <>
       <div className="h-screen bg-white dark:bg-black flex relative overflow-hidden">
-        <div className="h-full w-full flex">
+        <div className="h-full w-full flex min-w-0">
           {/* 왼쪽: File Explorer/Git Sidebar (VS Code style) */}
           <div className="w-64 flex-shrink-0 bg-gray-50 dark:bg-[#0a0a0a] border-r border-gray-200 dark:border-[#1a1a1a] flex flex-col">
             {/* Tab Bar */}
@@ -1607,7 +1678,7 @@ export default function ChatPage({ params }: Params) {
           </div>
 
           {/* 중간: Code/Preview 영역 */}
-          <div className="flex-1 h-full flex flex-col bg-black">
+          <div className="flex-1 min-w-0 h-full flex flex-col bg-black overflow-hidden">
             {/* 컨텐츠 영역 */}
             <div className="flex-1 min-h-0 flex flex-col">
               {/* Controls Bar */}
@@ -1721,6 +1792,29 @@ export default function ChatPage({ params }: Params) {
                 </div>
                 
                 <div className="flex items-center gap-2">
+                  {/* Word Wrap Toggle - only show in code view */}
+                  {(!showPreview || supportsPreview === false) && (
+                    <button 
+                      onClick={() => setWordWrap(!wordWrap)}
+                      className={`h-9 w-9 flex items-center justify-center rounded-lg transition-colors ${
+                        wordWrap 
+                          ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' 
+                          : 'bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-800'
+                      }`}
+                      title={wordWrap ? 'Disable word wrap' : 'Enable word wrap'}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path 
+                          d="M4 7h16M4 12h16M4 17h10l4 4v-4" 
+                          stroke="currentColor" 
+                          strokeWidth="2" 
+                          strokeLinecap="round" 
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                  )}
+                  
                   {/* Settings Button */}
                   <button 
                     onClick={() => setShowGlobalSettings(true)}
@@ -2112,7 +2206,7 @@ export default function ChatPage({ params }: Params) {
                           
                           {/* Code Content */}
                           <div className="flex-1 overflow-auto custom-scrollbar">
-                            <pre className="p-4 text-[13px] leading-[19px] font-mono text-gray-800 dark:text-[#d4d4d4] whitespace-pre" style={{ fontFamily: "'Fira Code', 'Consolas', 'Monaco', monospace" }}>
+                            <pre className={`p-4 text-[13px] leading-[19px] font-mono text-gray-800 dark:text-[#d4d4d4] ${wordWrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre'}`} style={{ fontFamily: "'Fira Code', 'Consolas', 'Monaco', monospace", ...(wordWrap && { wordWrap: 'break-word', overflowWrap: 'break-word' }) }}>
                               <code 
                                 className={`language-${isDiffView ? 'diff' : getFileLanguage(selectedFile)}`}
                                 dangerouslySetInnerHTML={{ 
@@ -2147,9 +2241,19 @@ export default function ChatPage({ params }: Params) {
 
           {/* 오른쪽: 채팅창 */}
           <div
-            style={{ width: '30%' }}
-            className="h-full border-l border-gray-200 dark:border-gray-800 flex flex-col"
+            style={{ width: `${chatPanelWidth}px` }}
+            className="flex-shrink-0 h-full border-l border-gray-200 dark:border-gray-800 flex flex-col relative"
           >
+            {/* Resize Handle */}
+            <div
+              className={`absolute left-0 top-0 w-1 h-full cursor-col-resize transition-colors z-10 ${
+                isResizing 
+                  ? 'bg-blue-500 bg-opacity-70' 
+                  : 'bg-transparent hover:bg-blue-500 hover:bg-opacity-50'
+              }`}
+              onMouseDown={handleMouseDown}
+              title="Drag to resize chat panel"
+            />
             {/* 채팅 헤더 */}
             <div className="bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 p-4 h-[73px] flex items-center">
               <div className="flex items-center gap-3">
